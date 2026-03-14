@@ -1,22 +1,11 @@
 const bcrypt = require('bcryptjs')
 const jwt = require('jsonwebtoken')
-const nodemailer = require('nodemailer')
+const sgMail = require('@sendgrid/mail')
 const pool = require('../db')
 
 const otpStore = {}
 
-const transporter = nodemailer.createTransport({
-  host: process.env.MAIL_HOST,
-  port: Number(process.env.MAIL_PORT),
-  secure: false,
-  auth: {
-    user: process.env.MAIL_USER,
-    pass: process.env.MAIL_PASS
-  },
-  tls: {
-    ciphers: 'SSLv3'
-  }
-})
+sgMail.setApiKey(process.env.SENDGRID_API_KEY)
 
 const register = async (req, res) => {
 	try {
@@ -105,8 +94,8 @@ const sendOtp = async (req, res) => {
 
 		otpStore[email] = { otp, expiresAt }
 
-		await transporter.sendMail({
-			from: `"CoreInventory" <${process.env.MAIL_USER}>`,
+		await sgMail.send({
+			from: process.env.SENDGRID_FROM_EMAIL,
 			to: email,
 			subject: 'Your CoreInventory OTP Code',
 			html: `
@@ -120,6 +109,7 @@ const sendOtp = async (req, res) => {
 
 		return res.json({ success: true, data: { message: 'OTP sent to ' + email } })
 	} catch (error) {
+		console.error('Send OTP error:', error.response?.body || error.message)
 		return res.status(500).json({ success: false, message: 'Failed to send OTP' })
 	}
 }
