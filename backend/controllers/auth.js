@@ -9,51 +9,88 @@ sgMail.setApiKey(process.env.SENDGRID_API_KEY)
 
 const register = async (req, res) => {
 	try {
-		const { name, email, password, role } = req.body
-
-		if (!name || !email || !password || !role) {
-			return res.status(400).json({ success: false, message: 'name, email, password and role are required' })
+		// check Authorization header
+		const authHeader = req.headers.authorization
+		if (!authHeader) {
+			return res.status(403).json({
+				success: false,
+				message: 'Registration is disabled. Contact your admin to create an account.'
+			})
 		}
 
-		const existingUser = await pool.query('SELECT id FROM users WHERE email = $1', [email])
+		// if token provided, verify it and check admin role
+		const token = authHeader.split(' ')[1]
+		let decoded
+		try {
+			decoded = jwt.verify(token, process.env.JWT_SECRET)
+		} catch (e) {
+			return res.status(401).json({ success: false, message: 'Invalid token' })
+		}
+
+		if (decoded.role !== 'admin') {
+			return res.status(403).json({
+				success: false,
+				message: 'Only admin can create new users'
+			})
+		}
+
+		const { name, login_id: loginId, email, password, role } = req.body
+		const resolvedName = (name || loginId || '').trim()
+		const resolvedRole = role || 'staff'
+
+		if (!resolvedName || !email || !password) {
+			return res.status(400).json({ success: false, message: 'name, email and password are required' })
+		}
+
+		const existingUser = await pool.query(
+			'SELECT id FROM users WHERE LOWER(email) = LOWER($1) OR LOWER(name) = LOWER($2)',
+			[email, resolvedName]
+		)
 		if (existingUser.rowCount > 0) {
-			return res.status(400).json({ success: false, message: 'Email already registered' })
+			return res.status(400).json({ success: false, message: 'Email or login name already registered' })
 		}
 
 		const passwordHash = await bcrypt.hash(password, 10)
 
 		const result = await pool.query(
 			'INSERT INTO users (name, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id, name, email, role',
-			[name, email, passwordHash, role]
+			[resolvedName, email, passwordHash, resolvedRole]
 		)
 
 		return res.status(201).json({ success: true, data: result.rows[0] })
-	} catch (error) {
-		return res.status(500).json({ success: false, message: 'Failed to register user' })
+	} catch (err) {
+		return res.status(500).json({ success: false, message: err.message })
 	}
 }
 
 const login = async (req, res) => {
 	try {
-		const { email, password } = req.body
+		const { email, login_id: loginId, password } = req.body
+		const identifier = (email || loginId || '').trim()
 
-		if (!email || !password) {
-			return res.status(400).json({ success: false, message: 'email and password are required' })
+		if (!identifier || !password) {
+			return res.status(400).json({ success: false, message: 'email/login and password are required' })
 		}
 
 		const result = await pool.query(
-			'SELECT id, name, email, password_hash, role FROM users WHERE email = $1',
-			[email]
+			'SELECT id, name, email, password_hash, role FROM users WHERE LOWER(email) = LOWER($1) OR LOWER(name) = LOWER($1) ORDER BY id DESC',
+			[identifier]
 		)
 
 		if (result.rowCount === 0) {
 			return res.status(401).json({ success: false, message: 'Invalid credentials' })
 		}
 
-		const user = result.rows[0]
-		const isPasswordValid = await bcrypt.compare(password, user.password_hash)
+		let user = null
+		for (const candidate of result.rows) {
+			const matches = await bcrypt.compare(password, candidate.password_hash)
+			if (matches) {
+				user = candidate
+				break
+			}
+		}
 
-		if (!isPasswordValid) {
+		if (!user) {
 			return res.status(401).json({ success: false, message: 'Invalid credentials' })
 		}
 
@@ -75,8 +112,8 @@ const login = async (req, res) => {
 				}
 			}
 		})
-	} catch (error) {
-		return res.status(500).json({ success: false, message: 'Failed to login' })
+	} catch (err) {
+		return res.status(500).json({ success: false, message: err.message })
 	}
 }
 
@@ -108,9 +145,9 @@ const sendOtp = async (req, res) => {
 		})
 
 		return res.json({ success: true, data: { message: 'OTP sent to ' + email } })
-	} catch (error) {
-		console.error('Send OTP error:', error.response?.body || error.message)
-		return res.status(500).json({ success: false, message: 'Failed to send OTP' })
+	} catch (err) {
+		console.error('Send OTP error:', err.response?.body || err.message)
+		return res.status(500).json({ success: false, message: err.message })
 	}
 }
 
@@ -131,9 +168,34 @@ const verifyOtp = async (req, res) => {
 
 		delete otpStore[email]
 
-		return res.json({ success: true, message: 'OTP verified' })
-	} catch (error) {
-		return res.status(500).json({ success: false, message: 'Failed to verify OTP' })
+		return res.json({ success: true, data: { message: 'OTP verified' } })
+	} catch (err) {
+		return res.status(500).json({ success: false, message: err.message })
+	}
+}
+
+const getUsers = async (req, res) => {
+	try {
+		if (req.user.role !== 'admin') {
+			return res.status(403).json({
+				success: false,
+				message: 'Only admin can view all users'
+			})
+		}
+
+		const result = await pool.query(
+			`SELECT id, name, email, role, created_at
+		   FROM users
+		   ORDER BY created_at DESC`
+		)
+
+		return res.json({
+			success: true,
+			data: result.rows,
+			total: result.rowCount
+		})
+	} catch (err) {
+		return res.status(500).json({ success: false, message: err.message })
 	}
 }
 
@@ -141,5 +203,6 @@ module.exports = {
 	register,
 	login,
 	sendOtp,
-	verifyOtp
+	verifyOtp,
+	getUsers
 }

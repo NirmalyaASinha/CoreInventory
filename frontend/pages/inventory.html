@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Inventory</title>
+  <link rel="stylesheet" href="/css/app.css" />
+</head>
+<body>
+  <div id="app"></div>
+  <dialog id="adjust-modal" class="profile-modal"></dialog>
+  <script type="module">
+    import { api } from '/js/api.js'
+    import { checkAuth } from '/js/auth.js'
+    import { renderAppShell } from '/js/layout.js'
+
+    const _token = localStorage.getItem('token')
+    const _user = JSON.parse(localStorage.getItem('user') || '{}')
+    if (!_token) window.location.href = '/pages/login.html'
+    checkAuth()
+
+    const urlParams = new URLSearchParams(window.location.search)
+    const initialStatus = (urlParams.get('status') || '').toLowerCase()
+
+    const page = renderAppShell({ title: 'Inventory', activeKey: 'inventory' })
+    page.innerHTML = `
+      <section class="card">
+        <form class="inline" id="filters">
+          <input id="search" placeholder="Search by product or SKU" />
+          <select id="warehouse-filter"><option value="">All Warehouses</option></select>
+          <select id="status-filter"><option value="">All Status</option><option value="low">Low Stock</option><option value="out">Out of Stock</option></select>
+          <button type="button" id="apply">Apply</button>
+        </form>
+      </section>
+      <div id="error"></div>
+      <div id="loading">Loading...</div>
+      <section class="card" id="table-card" style="display:none;">
+        <table>
+          <thead><tr><th>Product</th><th>SKU</th><th>Location</th><th>Warehouse</th><th>Qty</th><th>Status</th><th>Adjust</th></tr></thead>
+          <tbody id="inv-body"></tbody>
+        </table>
+      </section>
+    `
+
+    const errorBox = document.getElementById('error')
+    const loading = document.getElementById('loading')
+    let rawInventory = []
+
+    function statusLabel(row) {
+      const qty = Number(row.quantity)
+      const reorder = Number(row.reorder_level)
+      if (qty === 0) return { text: 'OUT STOCK', cls: 'stock-out' }
+      if (qty <= reorder) return { text: 'LOW STOCK', cls: 'stock-low' }
+      return { text: 'IN STOCK', cls: 'stock-ok' }
+    }
+
+    function showError(message) {
+      errorBox.style.display = 'block'
+      errorBox.textContent = message || 'Failed to load data. Please try again.'
+    }
+
+    function render(rows) {
+      const body = document.getElementById('inv-body')
+      body.innerHTML = ''
+      rows.forEach((row) => {
+        const status = statusLabel(row)
+        const tr = document.createElement('tr')
+        tr.innerHTML = `<td>${row.product_name}</td><td>${row.sku}</td><td>${row.location_name}</td><td>${row.warehouse_name}</td><td>${row.quantity}</td><td><span class="badge ${status.cls}">${status.text}</span></td><td><button data-adjust="${row.product_id}|${row.location_id}|${row.quantity}|${row.product_name}|${row.location_name}">Adjust</button></td>`
+        body.appendChild(tr)
+      })
+      document.getElementById('table-card').style.display = 'block'
+    }
+
+    function applyFilters() {
+      const search = document.getElementById('search').value.trim().toLowerCase()
+      const warehouse = document.getElementById('warehouse-filter').value
+      const status = document.getElementById('status-filter').value
+
+      let filtered = [...rawInventory]
+      if (search) {
+        filtered = filtered.filter((row) => (row.product_name || '').toLowerCase().includes(search) || (row.sku || '').toLowerCase().includes(search))
+      }
+      if (warehouse) {
+        filtered = filtered.filter((row) => String(row.warehouse_name) === String(warehouse))
+      }
+      if (status === 'low') {
+        filtered = filtered.filter((row) => Number(row.quantity) > 0 && Number(row.quantity) <= Number(row.reorder_level))
+      }
+      if (status === 'out') {
+        filtered = filtered.filter((row) => Number(row.quantity) === 0)
+      }
+      render(filtered)
+    }
+
+    async function loadInventory() {
+      loading.style.display = 'block'
+      const [inv, warehouses] = await Promise.all([api.getInventory(), api.getWarehouses()])
+      loading.style.display = 'none'
+
+      if (!inv?.success) {
+        showError(inv?.message)
+        return
+      }
+
+      rawInventory = inv.data || []
+      const warehouseFilter = document.getElementById('warehouse-filter')
+      warehouseFilter.innerHTML = '<option value="">All Warehouses</option>'
+      ;(warehouses?.data || []).forEach((w) => {
+        const opt = document.createElement('option')
+        opt.value = w.name
+        opt.textContent = w.name
+        warehouseFilter.appendChild(opt)
+      })
+
+      const statusFilter = document.getElementById('status-filter')
+      if (initialStatus === 'low' || initialStatus === 'out') {
+        statusFilter.value = initialStatus
+      }
+
+      applyFilters()
+    }
+
+    document.getElementById('apply').addEventListener('click', applyFilters)
+
+    document.getElementById('inv-body').addEventListener('click', (event) => {
+      const key = event.target.getAttribute('data-adjust')
+      if (!key) return
+      const [product_id, location_id, quantity, product_name, location_name] = key.split('|')
+      const modal = document.getElementById('adjust-modal')
+      modal.innerHTML = `
+        <div class="card">
+          <h3>Adjust Stock</h3>
+          <p><strong>Product:</strong> ${product_name}</p>
+          <p><strong>Location:</strong> ${location_name}</p>
+          <p><strong>Current Quantity:</strong> ${quantity}</p>
+          <form id="adjust-form" class="inline">
+            <input id="new-qty" type="number" placeholder="New Quantity" required />
+            <input id="reason" placeholder="Reason (optional)" />
+            <button type="submit">Update</button>
+            <button type="button" class="secondary" id="close-adjust">Cancel</button>
+          </form>
+        </div>
+      `
+
+      modal.showModal()
+      document.getElementById('close-adjust').addEventListener('click', () => modal.close())
+      document.getElementById('adjust-form').addEventListener('submit', async (ev) => {
+        ev.preventDefault()
+        const adjusted_quantity = Number(document.getElementById('new-qty').value)
+        const res = await api.adjustInventory({ product_id: Number(product_id), location_id: Number(location_id), adjusted_quantity })
+        if (!res?.success) {
+          showError(res?.message || 'Adjustment failed')
+          return
+        }
+        modal.close()
+        await loadInventory()
+      })
+    })
+
+    await loadInventory()
+  </script>
+</body>
+</html>

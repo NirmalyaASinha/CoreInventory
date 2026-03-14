@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>User Management</title>
+  <link rel="stylesheet" href="/css/app.css" />
+</head>
+<body>
+  <div id="app"></div>
+  <script type="module">
+    import { api } from '/js/api.js'
+    import { requireAdmin } from '/js/auth.js'
+    import { renderAppShell } from '/js/layout.js'
+
+    const _token = localStorage.getItem('token')
+    const _user = JSON.parse(localStorage.getItem('user') || '{}')
+    if (!_token) window.location.href = '/pages/login.html'
+    if (!_user || _user.role !== 'admin') window.location.href = '/pages/dashboard-staff.html'
+
+    const user = requireAdmin()
+    if (!user) throw new Error('admin required')
+
+    const page = renderAppShell({ title: 'User Management', activeKey: 'admin' })
+    page.innerHTML = `
+      <section class="card">
+        <h3>Create User</h3>
+        <form id="create-user-form" class="inline">
+          <input id="name" placeholder="Name" required />
+          <input id="email" type="email" placeholder="Email" required />
+          <input id="password" type="password" placeholder="Password" required />
+          <select id="role"><option value="staff">staff</option><option value="admin">admin</option></select>
+          <button type="submit">Create User</button>
+        </form>
+      </section>
+      <div id="error"></div>
+      <div id="loading">Loading...</div>
+      <section class="card" id="users-card" style="display:none;">
+        <table>
+          <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Created At</th></tr></thead>
+          <tbody id="users-body"></tbody>
+        </table>
+      </section>
+    `
+
+    const errorBox = document.getElementById('error')
+    const loading = document.getElementById('loading')
+
+    function showError(message) {
+      errorBox.style.display = 'block'
+      errorBox.textContent = message || 'Failed to load data. Please try again.'
+    }
+
+    async function loadUsers() {
+      loading.style.display = 'block'
+      const res = await api.getUsers()
+      loading.style.display = 'none'
+      if (!res?.success) {
+        showError(res?.message)
+        return
+      }
+      const body = document.getElementById('users-body')
+      body.innerHTML = ''
+      ;(res.data || []).forEach((u) => {
+        const tr = document.createElement('tr')
+        tr.innerHTML = `<td>${u.name || '-'}</td><td>${u.email || '-'}</td><td><span class="role-badge role-${u.role || 'staff'}">${u.role || 'staff'}</span></td><td>${u.created_at ? new Date(u.created_at).toLocaleString() : '-'}</td>`
+        body.appendChild(tr)
+      })
+      document.getElementById('users-card').style.display = 'block'
+    }
+
+    document.getElementById('create-user-form').addEventListener('submit', async (event) => {
+      event.preventDefault()
+      errorBox.style.display = 'none'
+      const payload = {
+        name: document.getElementById('name').value.trim(),
+        email: document.getElementById('email').value.trim(),
+        password: document.getElementById('password').value,
+        role: document.getElementById('role').value
+      }
+      const res = await api.register(payload)
+      if (!res?.success) {
+        showError(res?.message || 'Failed to create user')
+        return
+      }
+      event.target.reset()
+      await loadUsers()
+    })
+
+    await loadUsers()
+  </script>
+</body>
+</html>

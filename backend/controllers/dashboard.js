@@ -25,16 +25,16 @@ const getDashboard = async (req, res) => {
 		return res.json({
 			success: true,
 			data: {
-				totalProducts: Number(totalProductsResult.rows[0].count),
-				lowStock: Number(lowStockResult.rows[0].count),
-				outOfStock: Number(outOfStockResult.rows[0].count),
-				pendingReceipts: Number(pendingReceiptsResult.rows[0].count),
-				pendingDeliveries: Number(pendingDeliveriesResult.rows[0].count),
-				transfersScheduled: Number(transfersScheduledResult.rows[0].count)
+				totalProducts: parseInt(totalProductsResult.rows[0].count, 10),
+				lowStock: parseInt(lowStockResult.rows[0].count, 10),
+				outOfStock: parseInt(outOfStockResult.rows[0].count, 10),
+				pendingReceipts: parseInt(pendingReceiptsResult.rows[0].count, 10),
+				pendingDeliveries: parseInt(pendingDeliveriesResult.rows[0].count, 10),
+				transfersScheduled: parseInt(transfersScheduledResult.rows[0].count, 10)
 			}
 		})
-	} catch (error) {
-		return res.status(500).json({ success: false, message: 'Failed to fetch dashboard data' })
+	} catch (err) {
+		return res.status(500).json({ success: false, message: err.message })
 	}
 }
 

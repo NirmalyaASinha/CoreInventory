@@ -1,4 +1,4 @@
-window.COREINVENTORY_API_BASE = 'https://coreinventory-bjqx.onrender.com';
+window.COREINVENTORY_API_BASE = 'http://127.0.0.1:5000';
 
 function apiUrl(path) {
   const base = window.COREINVENTORY_API_BASE || '';

@@ -4,22 +4,22 @@ const getAllWarehouses = async (req, res) => {
 	try {
 		const result = await pool.query('SELECT * FROM warehouses ORDER BY name ASC')
 		return res.json({ success: true, data: result.rows, total: result.rowCount })
-	} catch (error) {
-		return res.status(500).json({ success: false, message: 'Failed to fetch warehouses' })
+	} catch (err) {
+		return res.status(500).json({ success: false, message: err.message })
 	}
 }
 
 const createWarehouse = async (req, res) => {
 	try {
-		const { name, address } = req.body
+		const { name, short_code, address } = req.body
 		const result = await pool.query(
-			'INSERT INTO warehouses (name, address) VALUES ($1, $2) RETURNING *',
-			[name, address]
+			'INSERT INTO warehouses (name, short_code, address) VALUES ($1, $2, $3) RETURNING *',
+			[name, short_code, address]
 		)
 
 		return res.status(201).json({ success: true, data: result.rows[0] })
-	} catch (error) {
-		return res.status(500).json({ success: false, message: 'Failed to create warehouse' })
+	} catch (err) {
+		return res.status(500).json({ success: false, message: err.message })
 	}
 }
 
@@ -29,8 +29,8 @@ const getWarehouseLocations = async (req, res) => {
 		const result = await pool.query('SELECT * FROM locations WHERE warehouse_id = $1', [id])
 
 		return res.json({ success: true, data: result.rows, total: result.rowCount })
-	} catch (error) {
-		return res.status(500).json({ success: false, message: 'Failed to fetch warehouse locations' })
+	} catch (err) {
+		return res.status(500).json({ success: false, message: err.message })
 	}
 }
 
@@ -45,8 +45,8 @@ const createLocation = async (req, res) => {
 		)
 
 		return res.status(201).json({ success: true, data: result.rows[0] })
-	} catch (error) {
-		return res.status(500).json({ success: false, message: 'Failed to create location' })
+	} catch (err) {
+		return res.status(500).json({ success: false, message: err.message })
 	}
 }
 

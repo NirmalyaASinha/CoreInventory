@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Move History</title>
+  <link rel="stylesheet" href="/css/app.css" />
+</head>
+<body>
+  <div id="app"></div>
+  <script type="module">
+    import { api } from '/js/api.js'
+    import { checkAuth } from '/js/auth.js'
+    import { renderAppShell } from '/js/layout.js'
+
+    const _token = localStorage.getItem('token')
+    const _user = JSON.parse(localStorage.getItem('user') || '{}')
+    if (!_token) window.location.href = '/pages/login.html'
+    checkAuth()
+
+    const urlParams = new URLSearchParams(window.location.search)
+    const initialType = (urlParams.get('type') || '').toUpperCase()
+
+    const page = renderAppShell({ title: 'Move History', activeKey: 'moves' })
+    page.innerHTML = `
+      <section class="card">
+        <form class="inline" id="filter-form">
+          <select id="type-filter">
+            <option value="">All Types</option>
+            <option value="IN">IN</option>
+            <option value="OUT">OUT</option>
+            <option value="TRANSFER">TRANSFER</option>
+            <option value="ADJUSTMENT">ADJUSTMENT</option>
+          </select>
+          <input id="from" type="date" />
+          <input id="to" type="date" />
+          <input id="product-search" placeholder="Product search" />
+          <button type="button" id="apply">Apply</button>
+        </form>
+      </section>
+      <div id="error"></div>
+      <div id="loading">Loading...</div>
+      <section class="card" id="moves-card" style="display:none;">
+        <table>
+          <thead><tr><th>Product</th><th>SKU</th><th>Type</th><th>Qty</th><th>Source</th><th>Destination</th><th>Date</th></tr></thead>
+          <tbody id="moves-body"></tbody>
+        </table>
+      </section>
+    `
+
+    const errorBox = document.getElementById('error')
+    const loading = document.getElementById('loading')
+    let allRows = []
+
+    function showError(message) {
+      errorBox.style.display = 'block'
+      errorBox.textContent = message || 'Failed to load data. Please try again.'
+    }
+
+    function renderRows(rows) {
+      const body = document.getElementById('moves-body')
+      body.innerHTML = ''
+      rows.forEach((m) => {
+        const tr = document.createElement('tr')
+        tr.innerHTML = `<td>${m.product_name || '-'}</td><td>${m.sku || '-'}</td><td><span class="badge status-${m.movement_type}">${m.movement_type}</span></td><td>${m.quantity}</td><td>${m.source_name || '-'}</td><td>${m.destination_name || '-'}</td><td>${m.created_at ? new Date(m.created_at).toLocaleString() : '-'}</td>`
+        body.appendChild(tr)
+      })
+      document.getElementById('moves-card').style.display = 'block'
+    }
+
+    function applyClientSearch() {
+      const q = document.getElementById('product-search').value.trim().toLowerCase()
+      if (!q) {
+        renderRows(allRows)
+        return
+      }
+      renderRows(allRows.filter((row) => (row.product_name || '').toLowerCase().includes(q) || (row.sku || '').toLowerCase().includes(q)))
+    }
+
+    async function loadMoves() {
+      loading.style.display = 'block'
+      const filters = {}
+      const type = document.getElementById('type-filter').value
+      const from = document.getElementById('from').value
+      const to = document.getElementById('to').value
+      if (type) filters.type = type
+      if (from) filters.from = from
+      if (to) filters.to = to
+
+      const res = await api.getMoves(Object.keys(filters).length ? filters : null)
+      loading.style.display = 'none'
+      if (!res?.success) {
+        showError(res?.message)
+        return
+      }
+      allRows = res.data || []
+      applyClientSearch()
+    }
+
+    if (['IN', 'OUT', 'TRANSFER', 'ADJUSTMENT'].includes(initialType)) {
+      document.getElementById('type-filter').value = initialType
+    }
+
+    document.getElementById('apply').addEventListener('click', loadMoves)
+    document.getElementById('product-search').addEventListener('input', applyClientSearch)
+
+    await loadMoves()
+  </script>
+</body>
+</html>

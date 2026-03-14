@@ -4,8 +4,8 @@ const getAllCategories = async (req, res) => {
 	try {
 		const result = await pool.query('SELECT * FROM categories ORDER BY name ASC')
 		return res.json({ success: true, data: result.rows, total: result.rowCount })
-	} catch (error) {
-		return res.status(500).json({ success: false, message: 'Failed to fetch categories' })
+	} catch (err) {
+		return res.status(500).json({ success: false, message: err.message })
 	}
 }
 
@@ -18,8 +18,8 @@ const createCategory = async (req, res) => {
 		)
 
 		return res.status(201).json({ success: true, data: result.rows[0] })
-	} catch (error) {
-		return res.status(500).json({ success: false, message: 'Failed to create category' })
+	} catch (err) {
+		return res.status(500).json({ success: false, message: err.message })
 	}
 }
 

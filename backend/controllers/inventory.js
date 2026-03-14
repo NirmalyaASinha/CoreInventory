@@ -3,16 +3,18 @@ const pool = require('../db')
 const getInventory = async (req, res) => {
 	try {
 		const { product_id, location_id } = req.query
-
-		let query = `SELECT i.*, p.name as product_name, p.sku,
-												l.name as location_name, w.name as warehouse_name
-								 FROM inventory i
-								 JOIN products p ON i.product_id = p.id
-								 JOIN locations l ON i.location_id = l.id
-								 JOIN warehouses w ON l.warehouse_id = w.id`
-
-		const conditions = []
 		const params = []
+		const conditions = []
+
+		let query = `SELECT i.*, p.name AS product_name, p.sku,
+							l.name AS location_name, w.name AS warehouse_name,
+							p.reorder_level,
+							CASE WHEN i.quantity <= p.reorder_level
+								 THEN true ELSE false END AS is_low_stock
+					 FROM inventory i
+					 JOIN products p ON i.product_id = p.id
+					 JOIN locations l ON i.location_id = l.id
+					 JOIN warehouses w ON l.warehouse_id = w.id`
 
 		if (product_id) {
 			params.push(product_id)
@@ -28,20 +30,32 @@ const getInventory = async (req, res) => {
 			query += ` WHERE ${conditions.join(' AND ')}`
 		}
 
+		query += ' ORDER BY i.id DESC'
 		const result = await pool.query(query, params)
 		return res.json({ success: true, data: result.rows, total: result.rowCount })
-	} catch (error) {
-		return res.status(500).json({ success: false, message: 'Failed to fetch inventory' })
+	} catch (err) {
+		return res.status(500).json({ success: false, message: err.message })
 	}
 }
 
 const adjustInventory = async (req, res) => {
-	const client = await pool.connect()
-
+	let client
 	try {
 		const { product_id, location_id, adjusted_quantity } = req.body
-
+		client = await pool.connect()
 		await client.query('BEGIN')
+
+		const currentResult = await client.query(
+			'SELECT quantity FROM inventory WHERE product_id = $1 AND location_id = $2 FOR UPDATE',
+			[product_id, location_id]
+		)
+
+		if (currentResult.rowCount === 0) {
+			throw new Error('Inventory record not found')
+		}
+
+		const previousQuantity = Number(currentResult.rows[0].quantity)
+		const movementQuantity = Number(adjusted_quantity) - previousQuantity
 
 		const updatedResult = await client.query(
 			'UPDATE inventory SET quantity = $1 WHERE product_id = $2 AND location_id = $3 RETURNING *',
@@ -54,18 +68,23 @@ const adjustInventory = async (req, res) => {
 		)
 
 		await client.query(
-			'INSERT INTO stock_movements (product_id, source_location, quantity, movement_type) VALUES ($1, $2, $3, $4)',
-			[product_id, location_id, adjusted_quantity, 'ADJUSTMENT']
+			`INSERT INTO stock_movements
+			 (product_id, source_location, quantity, movement_type)
+			 VALUES ($1, $2, $3, 'ADJUSTMENT')`,
+			[product_id, location_id, movementQuantity]
 		)
 
 		await client.query('COMMIT')
-
 		return res.json({ success: true, data: updatedResult.rows[0] })
-	} catch (error) {
-		await client.query('ROLLBACK')
-		return res.status(500).json({ success: false, message: 'Failed to adjust inventory' })
+	} catch (err) {
+		if (client) {
+			await client.query('ROLLBACK')
+		}
+		return res.status(500).json({ success: false, message: err.message })
 	} finally {
-		client.release()
+		if (client) {
+			client.release()
+		}
 	}
 }
 

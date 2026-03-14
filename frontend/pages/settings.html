@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Settings</title>
+  <link rel="stylesheet" href="/css/app.css" />
+</head>
+<body>
+  <div id="app"></div>
+  <script type="module">
+    import { api } from '/js/api.js'
+    import { checkAuth } from '/js/auth.js'
+    import { renderAppShell } from '/js/layout.js'
+
+    const _token = localStorage.getItem('token')
+    const _user = JSON.parse(localStorage.getItem('user') || '{}')
+    if (!_token) window.location.href = '/pages/login.html'
+    checkAuth()
+
+    const page = renderAppShell({ title: 'Settings', activeKey: 'settings' })
+    page.innerHTML = `
+      <section class="grid-2">
+        <article class="card">
+          <h3>Warehouse</h3>
+          <form id="warehouse-form" class="inline">
+            <input id="wh-name" placeholder="Name" required />
+            <input id="wh-code" placeholder="Short Code" required />
+            <input id="wh-address" placeholder="Address" required />
+            <button type="submit">Add Warehouse</button>
+          </form>
+        </article>
+        <article class="card" id="locations">
+          <h3>Location</h3>
+          <form id="location-form" class="inline">
+            <select id="wh-id" required></select>
+            <input id="loc-name" placeholder="Location name" required />
+            <button type="submit">Add Location</button>
+          </form>
+        </article>
+      </section>
+      <div id="error"></div>
+      <div id="loading">Loading...</div>
+      <section class="card" id="warehouse-list-card" style="display:none;">
+        <div id="warehouse-list"></div>
+      </section>
+    `
+
+    const errorBox = document.getElementById('error')
+    const loading = document.getElementById('loading')
+
+    function showError(message) {
+      errorBox.style.display = 'block'
+      errorBox.textContent = message || 'Failed to load data. Please try again.'
+    }
+
+    async function loadWarehouses() {
+      loading.style.display = 'block'
+      const res = await api.getWarehouses()
+      loading.style.display = 'none'
+      if (!res?.success) {
+        showError(res?.message)
+        return
+      }
+
+      const select = document.getElementById('wh-id')
+      select.innerHTML = '<option value="">Select warehouse</option>'
+      const holder = document.getElementById('warehouse-list')
+      holder.innerHTML = ''
+
+      for (const w of res.data || []) {
+        const option = document.createElement('option')
+        option.value = w.id
+        option.textContent = w.name
+        select.appendChild(option)
+
+        const locs = await api.getLocations(w.id)
+        const ul = document.createElement('ul')
+        ;(locs?.data || []).forEach((l) => {
+          const li = document.createElement('li')
+          li.textContent = l.name
+          ul.appendChild(li)
+        })
+
+        const card = document.createElement('article')
+        card.className = 'card'
+        card.innerHTML = `<h4>${w.name} (${w.short_code || '-'})</h4><p>${w.address || '-'}</p>`
+        card.appendChild(ul)
+        holder.appendChild(card)
+      }
+      document.getElementById('warehouse-list-card').style.display = 'block'
+    }
+
+    document.getElementById('warehouse-form').addEventListener('submit', async (event) => {
+      event.preventDefault()
+      const body = {
+        name: document.getElementById('wh-name').value.trim(),
+        short_code: document.getElementById('wh-code').value.trim(),
+        address: document.getElementById('wh-address').value.trim()
+      }
+      const res = await api.createWarehouse(body)
+      if (!res?.success) {
+        showError(res?.message || 'Failed to create warehouse')
+        return
+      }
+      event.target.reset()
+      await loadWarehouses()
+    })
+
+    document.getElementById('location-form').addEventListener('submit', async (event) => {
+      event.preventDefault()
+      const warehouseId = document.getElementById('wh-id').value
+      const name = document.getElementById('loc-name').value.trim()
+      const res = await api.createLocation(warehouseId, { name })
+      if (!res?.success) {
+        showError(res?.message || 'Failed to create location')
+        return
+      }
+      event.target.reset()
+      await loadWarehouses()
+    })
+
+    await loadWarehouses()
+  </script>
+</body>
+</html>

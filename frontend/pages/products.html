@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Products</title>
+  <link rel="stylesheet" href="/css/app.css" />
+</head>
+<body>
+  <div id="app"></div>
+  <script type="module">
+    import { api } from '/js/api.js'
+    import { checkAuth } from '/js/auth.js'
+    import { renderAppShell } from '/js/layout.js'
+
+    const _token = localStorage.getItem('token')
+    const _user = JSON.parse(localStorage.getItem('user') || '{}')
+    if (!_token) window.location.href = '/pages/login.html'
+    checkAuth()
+
+    const page = renderAppShell({ title: 'Products', activeKey: 'products' })
+    page.innerHTML = `
+      <section class="card">
+        <h3>Create Product</h3>
+        <form class="inline" id="product-form">
+          <input id="name" placeholder="Name" required />
+          <input id="sku" placeholder="SKU" required />
+          <select id="category_id" required></select>
+          <input id="unit" placeholder="Unit" required />
+          <input id="reorder_level" type="number" placeholder="Reorder Level" required />
+          <input id="initialStock" type="number" placeholder="Initial Stock" />
+          <input id="location_id" type="number" placeholder="Location ID" />
+          <button type="submit">Create</button>
+        </form>
+      </section>
+
+      <section class="card">
+        <form class="inline" id="product-filters">
+          <input id="search" placeholder="Search by name or SKU" />
+          <select id="category-filter"><option value="">All Categories</option></select>
+          <select id="status-filter"><option value="">All</option><option value="in">In Stock</option><option value="low">Low Stock</option><option value="out">Out of Stock</option></select>
+          <button type="button" id="apply-filter">Apply</button>
+        </form>
+      </section>
+
+      <div id="error"></div>
+      <div id="loading">Loading...</div>
+
+      <section class="card" id="products-table-card" style="display:none;">
+        <table>
+          <thead><tr><th>Name</th><th>SKU</th><th>Category</th><th>Unit</th><th>Reorder</th><th>On Hand</th><th>Status</th></tr></thead>
+          <tbody id="products-body"></tbody>
+        </table>
+      </section>
+
+      <section class="card" id="reorder-rules-card" style="display:none;">
+        <h3>Reordering Rules</h3>
+        <table>
+          <thead><tr><th>Product</th><th>SKU</th><th>Current Stock</th><th>Reorder Level</th><th>Status</th></tr></thead>
+          <tbody id="reorder-body"></tbody>
+        </table>
+      </section>
+    `
+
+    const errorBox = document.getElementById('error')
+    const loading = document.getElementById('loading')
+    let products = []
+
+    function showError(message) {
+      errorBox.style.display = 'block'
+      errorBox.textContent = message || 'Failed to load data. Please try again.'
+    }
+
+    function statusForRow(row) {
+      const qty = Number(row.on_hand || 0)
+      const reorder = Number(row.reorder_level || 0)
+      if (qty === 0) return { label: 'Out of Stock', cls: 'status-OUT' }
+      if (qty <= reorder) return { label: 'Low Stock', cls: 'status-ADJUSTMENT' }
+      return { label: 'In Stock', cls: 'status-IN' }
+    }
+
+    function renderTable(rows) {
+      const body = document.getElementById('products-body')
+      body.innerHTML = ''
+      rows.forEach((p) => {
+        const state = statusForRow(p)
+        const tr = document.createElement('tr')
+        tr.innerHTML = `<td>${p.name}</td><td>${p.sku}</td><td>${p.category_name || '-'}</td><td>${p.unit || '-'}</td><td>${p.reorder_level || 0}</td><td>${p.on_hand || 0}</td><td><span class="badge ${state.cls}">${state.label}</span></td>`
+        body.appendChild(tr)
+      })
+      document.getElementById('products-table-card').style.display = 'block'
+
+      const reorderBody = document.getElementById('reorder-body')
+      reorderBody.innerHTML = ''
+      rows
+        .filter((p) => Number(p.on_hand || 0) <= Number(p.reorder_level || 0))
+        .forEach((p) => {
+          const state = statusForRow(p)
+          const tr = document.createElement('tr')
+          tr.innerHTML = `<td>${p.name}</td><td>${p.sku}</td><td>${p.on_hand || 0}</td><td>${p.reorder_level || 0}</td><td><span class="badge ${state.cls}">${state.label}</span></td>`
+          reorderBody.appendChild(tr)
+        })
+      document.getElementById('reorder-rules-card').style.display = 'block'
+    }
+
+    function applyFilters() {
+      const search = document.getElementById('search').value.trim().toLowerCase()
+      const category = document.getElementById('category-filter').value
+      const status = document.getElementById('status-filter').value
+
+      let filtered = [...products]
+      if (search) {
+        filtered = filtered.filter((p) => (p.name || '').toLowerCase().includes(search) || (p.sku || '').toLowerCase().includes(search))
+      }
+      if (category) {
+        filtered = filtered.filter((p) => String(p.category_id) === String(category))
+      }
+      if (status === 'in') {
+        filtered = filtered.filter((p) => Number(p.on_hand || 0) > Number(p.reorder_level || 0))
+      }
+      if (status === 'low') {
+        filtered = filtered.filter((p) => Number(p.on_hand || 0) > 0 && Number(p.on_hand || 0) <= Number(p.reorder_level || 0))
+      }
+      if (status === 'out') {
+        filtered = filtered.filter((p) => Number(p.on_hand || 0) === 0)
+      }
+      renderTable(filtered)
+    }
+
+    async function loadCategories() {
+      const res = await api.getCategories()
+      if (!res?.success) return
+      const createCategory = document.getElementById('category_id')
+      const filterCategory = document.getElementById('category-filter')
+      createCategory.innerHTML = '<option value="">Select Category</option>'
+      filterCategory.innerHTML = '<option value="">All Categories</option>'
+      res.data.forEach((c) => {
+        const one = document.createElement('option')
+        one.value = c.id
+        one.textContent = c.name
+        createCategory.appendChild(one)
+        const two = document.createElement('option')
+        two.value = c.id
+        two.textContent = c.name
+        filterCategory.appendChild(two)
+      })
+    }
+
+    async function loadProducts() {
+      loading.style.display = 'block'
+      const res = await api.getProducts()
+      loading.style.display = 'none'
+      if (!res?.success) {
+        showError(res?.message)
+        return
+      }
+      products = res.data || []
+      renderTable(products)
+    }
+
+    document.getElementById('apply-filter').addEventListener('click', applyFilters)
+
+    document.getElementById('product-form').addEventListener('submit', async (event) => {
+      event.preventDefault()
+      errorBox.style.display = 'none'
+      const payload = {
+        name: document.getElementById('name').value.trim(),
+        sku: document.getElementById('sku').value.trim(),
+        category_id: Number(document.getElementById('category_id').value),
+        unit: document.getElementById('unit').value.trim(),
+        reorder_level: Number(document.getElementById('reorder_level').value),
+        initialStock: document.getElementById('initialStock').value ? Number(document.getElementById('initialStock').value) : undefined,
+        location_id: document.getElementById('location_id').value ? Number(document.getElementById('location_id').value) : undefined
+      }
+      const res = await api.createProduct(payload)
+      if (!res?.success) {
+        showError(res?.message || 'Failed to create product')
+        return
+      }
+      event.target.reset()
+      await loadProducts()
+    })
+
+    await loadCategories()
+    await loadProducts()
+  </script>
+</body>
+</html>

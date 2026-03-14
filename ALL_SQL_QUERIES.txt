@@ -1,0 +1,343 @@
+CoreInventory - SQL Query Inventory
+Generated from current backend source files.
+
+========================================
+backend/index.js
+========================================
+1) SELECT 1
+2) SELECT id, name, email, role, created_at FROM users ORDER BY id DESC
+
+========================================
+backend/controllers/auth.js
+========================================
+1) SELECT id FROM users WHERE LOWER(email) = LOWER($1) OR LOWER(name) = LOWER($2)
+2) INSERT INTO users (name, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id, name, email, role
+3) SELECT id, name, email, password_hash, role FROM users WHERE LOWER(email) = LOWER($1) OR LOWER(name) = LOWER($1) ORDER BY id DESC
+
+========================================
+backend/controllers/products.js
+========================================
+1) SELECT p.*, c.name AS category_name,
+          COALESCE(SUM(i.quantity), 0) AS on_hand
+   FROM products p
+   LEFT JOIN categories c ON p.category_id = c.id
+   LEFT JOIN inventory i ON p.id = i.product_id
+   GROUP BY p.id, c.name
+   ORDER BY p.created_at DESC
+
+2) SELECT p.*, c.name AS category_name
+   FROM products p
+   LEFT JOIN categories c ON p.category_id = c.id
+   WHERE p.id = $1
+
+3) INSERT INTO products (name, sku, category_id, unit, reorder_level)
+   VALUES ($1, $2, $3, $4, $5) RETURNING *
+
+4) INSERT INTO inventory (product_id, location_id, quantity)
+   VALUES ($1, $2, $3)
+   ON CONFLICT (product_id, location_id)
+   DO UPDATE SET quantity = EXCLUDED.quantity
+
+5) UPDATE products
+   SET name = $1, sku = $2, category_id = $3, unit = $4, reorder_level = $5
+   WHERE id = $6
+   RETURNING *
+
+6) SELECT i.quantity, l.name AS location_name,
+          w.name AS warehouse_name
+   FROM inventory i
+   JOIN locations l ON i.location_id = l.id
+   JOIN warehouses w ON l.warehouse_id = w.id
+   WHERE i.product_id = $1
+
+========================================
+backend/controllers/categories.js
+========================================
+1) SELECT * FROM categories ORDER BY name ASC
+2) INSERT INTO categories (name, description) VALUES ($1, $2) RETURNING *
+
+========================================
+backend/controllers/receipts.js
+========================================
+1) SELECT EXISTS (
+       SELECT 1
+       FROM information_schema.columns
+       WHERE table_schema = 'public'
+         AND table_name = $1
+         AND column_name = $2
+   ) AS has_column
+
+2) SELECT r.*, u.name AS created_by_name
+   FROM receipts r
+   LEFT JOIN users u ON r.created_by = u.id
+
+3) SELECT r.*, 'REC/' || LPAD(CAST(r.id AS TEXT), 3, '0') AS reference,
+          u.name AS created_by_name
+   FROM receipts r
+   LEFT JOIN users u ON r.created_by = u.id
+
+4) SELECT * FROM receipts WHERE id = $1
+
+5) SELECT r.*, 'REC/' || LPAD(CAST(r.id AS TEXT), 3, '0') AS reference
+   FROM receipts r
+   WHERE id = $1
+
+6) SELECT ri.*, p.name AS product_name, p.sku
+   FROM receipt_items ri
+   JOIN products p ON ri.product_id = p.id
+   WHERE ri.receipt_id = $1
+
+7) SELECT COUNT(*) FROM receipts
+
+8) BEGIN
+
+9) INSERT INTO receipts (reference, supplier_name, status, created_by)
+   VALUES ($1, $2, 'DRAFT', $3)
+   RETURNING *
+
+10) INSERT INTO receipts (supplier_name, status, created_by)
+    VALUES ($1, 'DRAFT', $2)
+    RETURNING *
+
+11) INSERT INTO receipt_items (receipt_id, product_id, quantity)
+    VALUES ($1, $2, $3)
+    RETURNING *
+
+12) COMMIT
+
+13) ROLLBACK
+
+14) UPDATE receipts SET supplier_name = $1 WHERE id = $2 RETURNING *
+
+15) SELECT * FROM receipt_items WHERE receipt_id = $1
+
+16) UPDATE receipts SET status = 'DONE' WHERE id = $1
+
+17) SELECT id FROM locations ORDER BY id ASC LIMIT 1
+
+18) INSERT INTO stock_movements
+    (product_id, destination_location, quantity, movement_type)
+    VALUES ($1, $2, $3, 'IN')
+
+19) INSERT INTO inventory (product_id, location_id, quantity)
+    VALUES ($1, $2, $3)
+    ON CONFLICT (product_id, location_id)
+    DO UPDATE SET quantity = inventory.quantity + EXCLUDED.quantity
+
+20) UPDATE receipts SET status = 'CANCELLED' WHERE id = $1 RETURNING *
+
+========================================
+backend/controllers/deliveries.js
+========================================
+1) SELECT EXISTS (
+       SELECT 1
+       FROM information_schema.columns
+       WHERE table_schema = 'public'
+         AND table_name = $1
+         AND column_name = $2
+   ) AS has_column
+
+2) SELECT d.*, u.name AS created_by_name
+   FROM deliveries d
+   LEFT JOIN users u ON d.created_by = u.id
+
+3) SELECT d.*, 'DEL/' || LPAD(CAST(d.id AS TEXT), 3, '0') AS reference,
+          u.name AS created_by_name
+   FROM deliveries d
+   LEFT JOIN users u ON d.created_by = u.id
+
+4) SELECT * FROM deliveries WHERE id = $1
+
+5) SELECT d.*, 'DEL/' || LPAD(CAST(d.id AS TEXT), 3, '0') AS reference
+   FROM deliveries d
+   WHERE id = $1
+
+6) SELECT di.*, p.name AS product_name, p.sku
+   FROM delivery_items di
+   JOIN products p ON di.product_id = p.id
+   WHERE di.delivery_id = $1
+
+7) SELECT COUNT(*) FROM deliveries
+
+8) BEGIN
+
+9) INSERT INTO deliveries (reference, customer_name, status, created_by)
+   VALUES ($1, $2, 'DRAFT', $3)
+   RETURNING *
+
+10) INSERT INTO deliveries (customer_name, status, created_by)
+    VALUES ($1, 'DRAFT', $2)
+    RETURNING *
+
+11) INSERT INTO delivery_items (delivery_id, product_id, quantity)
+    VALUES ($1, $2, $3)
+    RETURNING *
+
+12) COMMIT
+
+13) ROLLBACK
+
+14) UPDATE deliveries SET customer_name = $1 WHERE id = $2 RETURNING *
+
+15) SELECT * FROM delivery_items WHERE delivery_id = $1
+
+16) UPDATE deliveries SET status = 'DONE' WHERE id = $1
+
+17) SELECT location_id
+    FROM inventory
+    WHERE product_id = $1 AND quantity >= $2
+    ORDER BY quantity DESC, location_id ASC
+    LIMIT 1
+
+18) INSERT INTO stock_movements
+    (product_id, source_location, quantity, movement_type)
+    VALUES ($1, $2, $3, 'OUT')
+
+19) UPDATE inventory
+    SET quantity = quantity - $1
+    WHERE product_id = $2 AND location_id = $3 AND quantity >= $1
+    RETURNING *
+
+20) UPDATE deliveries SET status = 'CANCELLED' WHERE id = $1 RETURNING *
+
+========================================
+backend/controllers/transfers.js
+========================================
+1) SELECT EXISTS (
+       SELECT 1
+       FROM information_schema.columns
+       WHERE table_schema = 'public'
+         AND table_name = $1
+         AND column_name = $2
+   ) AS has_column
+
+2) SELECT t.*, u.name AS created_by_name
+   FROM transfers t
+   LEFT JOIN users u ON t.created_by = u.id
+
+3) SELECT t.*, 'TRF/' || LPAD(CAST(t.id AS TEXT), 3, '0') AS reference,
+          u.name AS created_by_name
+   FROM transfers t
+   LEFT JOIN users u ON t.created_by = u.id
+
+4) SELECT * FROM transfers WHERE id = $1
+
+5) SELECT t.*, 'TRF/' || LPAD(CAST(t.id AS TEXT), 3, '0') AS reference
+   FROM transfers t
+   WHERE id = $1
+
+6) SELECT ti.*, p.name AS product_name, p.sku
+   FROM transfer_items ti
+   JOIN products p ON ti.product_id = p.id
+   WHERE ti.transfer_id = $1
+
+7) SELECT COUNT(*) FROM transfers
+
+8) BEGIN
+
+9) INSERT INTO transfers (reference, source_location, destination_location, status, created_by)
+   VALUES ($1, $2, $3, 'DRAFT', $4)
+   RETURNING *
+
+10) INSERT INTO transfers (source_location, destination_location, status, created_by)
+    VALUES ($1, $2, 'DRAFT', $3)
+    RETURNING *
+
+11) INSERT INTO transfer_items (transfer_id, product_id, quantity)
+    VALUES ($1, $2, $3)
+    RETURNING *
+
+12) COMMIT
+
+13) ROLLBACK
+
+14) SELECT * FROM transfer_items WHERE transfer_id = $1
+
+15) UPDATE transfers SET status = 'DONE' WHERE id = $1
+
+16) INSERT INTO stock_movements
+    (product_id, source_location, destination_location, quantity, movement_type)
+    VALUES ($1, $2, $3, $4, 'TRANSFER')
+
+17) UPDATE inventory
+    SET quantity = quantity - $1
+    WHERE product_id = $2 AND location_id = $3 AND quantity >= $1
+    RETURNING *
+
+18) INSERT INTO inventory (product_id, location_id, quantity)
+    VALUES ($1, $2, $3)
+    ON CONFLICT (product_id, location_id)
+    DO UPDATE SET quantity = inventory.quantity + EXCLUDED.quantity
+
+19) UPDATE transfers SET status = 'CANCELLED' WHERE id = $1 RETURNING *
+
+========================================
+backend/controllers/inventory.js
+========================================
+1) SELECT i.*, p.name AS product_name, p.sku,
+          l.name AS location_name, w.name AS warehouse_name,
+          p.reorder_level,
+          CASE WHEN i.quantity <= p.reorder_level
+               THEN true ELSE false END AS is_low_stock
+   FROM inventory i
+   JOIN products p ON i.product_id = p.id
+   JOIN locations l ON i.location_id = l.id
+   JOIN warehouses w ON l.warehouse_id = w.id
+   -- optional WHERE added dynamically:
+   --   i.product_id = $n
+   --   i.location_id = $n
+   ORDER BY i.id DESC
+
+2) BEGIN
+
+3) SELECT quantity FROM inventory WHERE product_id = $1 AND location_id = $2 FOR UPDATE
+
+4) UPDATE inventory SET quantity = $1 WHERE product_id = $2 AND location_id = $3 RETURNING *
+
+5) INSERT INTO stock_adjustments (product_id, location_id, adjusted_quantity)
+   VALUES ($1, $2, $3)
+
+6) INSERT INTO stock_movements
+   (product_id, source_location, quantity, movement_type)
+   VALUES ($1, $2, $3, 'ADJUSTMENT')
+
+7) COMMIT
+
+8) ROLLBACK
+
+========================================
+backend/controllers/moves.js
+========================================
+1) SELECT sm.*, p.name AS product_name, p.sku,
+          sl.name AS source_name,
+          dl.name AS destination_name
+   FROM stock_movements sm
+   JOIN products p ON sm.product_id = p.id
+   LEFT JOIN locations sl ON sm.source_location = sl.id
+   LEFT JOIN locations dl ON sm.destination_location = dl.id
+   -- optional WHERE added dynamically:
+   --   sm.product_id = $n
+   --   sm.movement_type = $n
+   --   sm.created_at >= $n
+   --   sm.created_at <= $n
+   ORDER BY sm.id DESC
+
+========================================
+backend/controllers/warehouses.js
+========================================
+1) SELECT * FROM warehouses ORDER BY name ASC
+2) INSERT INTO warehouses (name, short_code, address) VALUES ($1, $2, $3) RETURNING *
+3) SELECT * FROM locations WHERE warehouse_id = $1
+4) INSERT INTO locations (warehouse_id, name) VALUES ($1, $2) RETURNING *
+
+========================================
+backend/controllers/dashboard.js
+========================================
+1) SELECT COUNT(*) FROM products
+2) SELECT COUNT(*) FROM products p
+   JOIN inventory i ON p.id = i.product_id
+   WHERE i.quantity <= p.reorder_level AND i.quantity > 0
+3) SELECT COUNT(*) FROM inventory WHERE quantity = 0
+4) SELECT COUNT(*) FROM receipts WHERE status IN ('DRAFT','WAITING','READY')
+5) SELECT COUNT(*) FROM deliveries WHERE status IN ('DRAFT','WAITING','READY')
+6) SELECT COUNT(*) FROM transfers WHERE status IN ('DRAFT','WAITING','READY')

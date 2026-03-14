@@ -4,9 +4,9 @@ const getMoveHistory = async (req, res) => {
 	try {
 		const { product_id, type, from, to } = req.query
 
-		let query = `SELECT sm.*, p.name as product_name, p.sku,
-												sl.name as source_location_name,
-												dl.name as destination_location_name
+		let query = `SELECT sm.*, p.name AS product_name, p.sku,
+								sl.name AS source_name,
+								dl.name AS destination_name
 								 FROM stock_movements sm
 								 JOIN products p ON sm.product_id = p.id
 								 LEFT JOIN locations sl ON sm.source_location = sl.id
@@ -26,12 +26,12 @@ const getMoveHistory = async (req, res) => {
 		}
 
 		if (from) {
-			params.push(from)
+			params.push(new Date(from + 'T00:00:00.000Z'))
 			conditions.push(`sm.created_at >= $${params.length}`)
 		}
 
 		if (to) {
-			params.push(to)
+			params.push(new Date(to + 'T23:59:59.999Z'))
 			conditions.push(`sm.created_at <= $${params.length}`)
 		}
 
@@ -44,8 +44,8 @@ const getMoveHistory = async (req, res) => {
 		const result = await pool.query(query, params)
 
 		return res.json({ success: true, data: result.rows, total: result.rowCount })
-	} catch (error) {
-		return res.status(500).json({ success: false, message: 'Failed to fetch move history' })
+	} catch (err) {
+		return res.status(500).json({ success: false, message: err.message })
 	}
 }
 

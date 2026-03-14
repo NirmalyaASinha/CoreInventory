@@ -2,37 +2,46 @@ const pool = require('../db')
 
 const getAllProducts = async (req, res) => {
 	try {
-		const result = await pool.query('SELECT * FROM products ORDER BY created_at DESC')
+		const result = await pool.query(
+			`SELECT p.*, c.name AS category_name,
+					COALESCE(SUM(i.quantity), 0) AS on_hand
+			 FROM products p
+			 LEFT JOIN categories c ON p.category_id = c.id
+			 LEFT JOIN inventory i ON p.id = i.product_id
+			 GROUP BY p.id, c.name
+			 ORDER BY p.created_at DESC`
+		)
 		return res.json({ success: true, data: result.rows, total: result.rowCount })
-	} catch (error) {
-		return res.status(500).json({ success: false, message: 'Failed to fetch products' })
+	} catch (err) {
+		return res.status(500).json({ success: false, message: err.message })
 	}
 }
 
 const getProductById = async (req, res) => {
 	try {
 		const { id } = req.params
-		const result = await pool.query('SELECT * FROM products WHERE id = $1', [id])
+		const result = await pool.query(
+			`SELECT p.*, c.name AS category_name
+			 FROM products p
+			 LEFT JOIN categories c ON p.category_id = c.id
+			 WHERE p.id = $1`,
+			[id]
+		)
 
 		if (result.rowCount === 0) {
 			return res.status(404).json({ success: false, message: 'Product not found' })
 		}
 
 		return res.json({ success: true, data: result.rows[0] })
-	} catch (error) {
-		return res.status(500).json({ success: false, message: 'Failed to fetch product' })
+	} catch (err) {
+		return res.status(500).json({ success: false, message: err.message })
 	}
 }
 
 const createProduct = async (req, res) => {
-	const client = await pool.connect()
-
 	try {
 		const { name, sku, category_id, unit, reorder_level, initialStock, location_id } = req.body
-
-		await client.query('BEGIN')
-
-		const productResult = await client.query(
+		const productResult = await pool.query(
 			'INSERT INTO products (name, sku, category_id, unit, reorder_level) VALUES ($1, $2, $3, $4, $5) RETURNING *',
 			[name, sku, category_id, unit, reorder_level]
 		)
@@ -40,20 +49,18 @@ const createProduct = async (req, res) => {
 		const newProduct = productResult.rows[0]
 
 		if (initialStock != null && location_id != null) {
-			await client.query(
-				'INSERT INTO inventory (product_id, location_id, quantity) VALUES ($1, $2, $3)',
+			await pool.query(
+				`INSERT INTO inventory (product_id, location_id, quantity)
+				 VALUES ($1, $2, $3)
+				 ON CONFLICT (product_id, location_id)
+				 DO UPDATE SET quantity = EXCLUDED.quantity`,
 				[newProduct.id, location_id, initialStock]
 			)
 		}
 
-		await client.query('COMMIT')
-
 		return res.status(201).json({ success: true, data: newProduct })
-	} catch (error) {
-		await client.query('ROLLBACK')
-		return res.status(500).json({ success: false, message: 'Failed to create product' })
-	} finally {
-		client.release()
+	} catch (err) {
+		return res.status(500).json({ success: false, message: err.message })
 	}
 }
 
@@ -72,8 +79,8 @@ const updateProduct = async (req, res) => {
 		}
 
 		return res.json({ success: true, data: result.rows[0] })
-	} catch (error) {
-		return res.status(500).json({ success: false, message: 'Failed to update product' })
+	} catch (err) {
+		return res.status(500).json({ success: false, message: err.message })
 	}
 }
 
@@ -82,7 +89,8 @@ const getProductStock = async (req, res) => {
 		const { id } = req.params
 
 		const result = await pool.query(
-			`SELECT i.*, l.name as location_name, w.name as warehouse_name
+			`SELECT i.quantity, l.name AS location_name,
+					w.name AS warehouse_name
 			 FROM inventory i
 			 JOIN locations l ON i.location_id = l.id
 			 JOIN warehouses w ON l.warehouse_id = w.id
@@ -90,9 +98,9 @@ const getProductStock = async (req, res) => {
 			[id]
 		)
 
-		return res.json({ success: true, data: result.rows })
-	} catch (error) {
-		return res.status(500).json({ success: false, message: 'Failed to fetch product stock' })
+		return res.json({ success: true, data: result.rows, total: result.rowCount })
+	} catch (err) {
+		return res.status(500).json({ success: false, message: err.message })
 	}
 }
 

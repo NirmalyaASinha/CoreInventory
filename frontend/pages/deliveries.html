@@ -3,442 +3,137 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>CoreInventory — Delivery</title>
-  <style>
-    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-    body{min-height:100vh;background:#0a0f2e;color:#fff;font-family:'Segoe UI',system-ui,-apple-system,sans-serif}
-
-    .navbar{position:fixed;top:0;left:0;right:0;height:56px;background:#111936;border-bottom:1px solid #1e2d5a;display:flex;align-items:center;justify-content:space-between;padding:0 32px;z-index:1000}
-    .nav-links{display:flex;align-items:center;gap:28px;list-style:none}
-    .nav-links li{position:relative}
-    .nav-links a,.nav-links .nav-btn{background:none;border:none;height:56px;display:flex;align-items:center;gap:4px;color:#a0aec0;text-decoration:none;cursor:pointer;font-size:14px;font-family:inherit;border-bottom:2px solid transparent;transition:.15s}
-    .nav-links a:hover,.nav-links .nav-btn:hover{color:#fff}
-    .nav-links li.active>a,.nav-links li.active>.nav-btn{color:#fff;border-bottom-color:#2563eb}
-    .arrow{font-size:10px;opacity:.7;transition:transform .2s}
-    .nav-links li:hover .arrow,.nav-links li.open .arrow{transform:rotate(180deg)}
-    .dropdown{display:none;position:absolute;left:0;top:calc(100% + 1px);min-width:160px;background:#1a2347;border:1px solid #1e2d5a;border-radius:8px;padding:8px 0;box-shadow:0 8px 24px rgba(0,0,0,.4);z-index:200}
-    .nav-links li:hover .dropdown,.nav-links li.open .dropdown{display:block}
-    .dropdown a{display:block;padding:10px 16px;color:#a0aec0;text-decoration:none;font-size:13px}
-    .dropdown a:hover{background:#2563eb;color:#fff}
-    .nav-right{display:flex;align-items:center;gap:12px;position:relative}
-    .nav-title{font-size:15px;font-weight:700}
-    .avatar{width:34px;height:34px;border-radius:50%;border:0;background:#2563eb;color:#fff;font-size:13px;font-weight:700;cursor:pointer}
-    .avatar-menu{display:none;position:absolute;right:0;top:calc(100% + 10px);min-width:150px;background:#1a2347;border:1px solid #1e2d5a;border-radius:8px;padding:8px 0;z-index:300}
-    .avatar-menu.open{display:block}
-    .avatar-menu a,.avatar-menu button{display:block;width:100%;padding:10px 16px;color:#a0aec0;background:none;border:none;text-decoration:none;text-align:left;cursor:pointer;font-size:13px}
-    .avatar-menu a:hover,.avatar-menu button:hover{background:#2563eb;color:#fff}
-
-    .main{margin-top:56px;padding:32px;position:relative}
-    .header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
-    .header-left{display:flex;align-items:center;gap:16px}
-    .new-btn{border:1px solid #1e2d5a;background:transparent;color:#fff;border-radius:6px;padding:6px 16px;cursor:pointer}
-    .title{font-size:24px;font-weight:700}
-    .header-right{display:flex;align-items:center;gap:8px}
-    .icon-btn{width:32px;height:32px;border-radius:50%;border:none;background:#1a2347;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center}
-    .icon-btn:hover{background:#2563eb}
-
-    .search{position:absolute;right:32px;top:84px;width:240px;background:#1a2347;color:#fff;border:1px solid #2563eb;border-radius:6px;padding:8px 12px;opacity:0;transform:translateY(-8px);pointer-events:none;transition:opacity .2s,transform .2s}
-    .search.show{opacity:1;transform:translateY(0);pointer-events:auto}
-    .search::placeholder{color:#4a5568}
-
-    .table-wrap{background:#111936;border:1px solid #1e2d5a;border-radius:10px;overflow:hidden}
-    table{width:100%;border-collapse:collapse}
-    thead th{background:#1a2347;padding:12px 16px;color:#a0aec0;font-size:12px;letter-spacing:.05em;text-transform:uppercase;text-align:left;border-bottom:1px solid #1e2d5a}
-    tbody tr{border-bottom:1px dashed #1e2d5a;cursor:pointer}
-    tbody tr:hover{background:#1a2347}
-    tbody td{padding:12px 16px;font-size:13px;color:#fff}
-    .ref{font-family:monospace;font-weight:600;color:#ef4444}
-
-    .status{padding:3px 10px;border-radius:20px;font-size:11px;display:inline-block}
-    .st-draft{background:#4a5568;color:#fff}
-    .st-ready{background:#f59e0b;color:#1a1a1a}
-    .st-done{background:#10b981;color:#fff}
-    .st-waiting{background:#2563eb;color:#fff}
-
-    .skeleton{padding:0 16px}
-    .sk-row{height:46px;display:flex;align-items:center;border-bottom:1px dashed #1e2d5a}
-    .sk-bar{height:12px;border-radius:8px;background:#2a3660;position:relative;overflow:hidden}
-    .sk-bar::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.08),transparent);animation:shimmer 1.2s infinite}
-    .w1{width:20%}.w2{width:14%;margin-left:7%}.w3{width:16%;margin-left:8%}.w4{width:12%;margin-left:8%}
-    @keyframes shimmer{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
-
-    .empty{display:none;color:#a0aec0;text-align:center;padding:40px}
-
-    .detail-view{display:none}
-    .back-link{color:#a0aec0;cursor:pointer;font-size:14px;margin-bottom:18px;display:inline-block}
-    .back-link:hover{color:#fff}
-
-    .detail-top{display:flex;align-items:center;justify-content:space-between;gap:20px;margin-bottom:20px;flex-wrap:wrap}
-    .btn-row{display:flex;gap:10px}
-    .btn{border:1px solid #1e2d5a;border-radius:6px;padding:8px 20px;font-size:13px;cursor:pointer;font-weight:600}
-    .btn-primary{background:#2563eb;color:#fff;border-color:#2563eb}
-    .btn-primary:hover{background:#3b82f6}
-    .btn-outline{background:transparent;color:#a0aec0}
-    .btn-outline:hover{color:#fff}
-    #printBtn{display:none}
-
-    .flow{display:flex;gap:8px;align-items:center}
-    .flow-pill{padding:4px 12px;border-radius:999px;border:1px solid #1e2d5a;color:#a0aec0;font-size:12px}
-    .flow-pill.active{background:#2563eb;border-color:#2563eb;color:#fff}
-
-    .doc-ref{font-size:22px;color:#fff;font-weight:700;font-family:monospace;margin-bottom:18px}
-    .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px 20px;margin-bottom:18px}
-    .label{display:block;font-size:12px;color:#a0aec0;margin-bottom:6px}
-    .input,.select{width:100%;background:#1a2347;color:#fff;border:1px solid #1e2d5a;border-radius:6px;padding:10px 12px;font-size:14px;outline:none}
-    .input:focus,.select:focus{border-color:#2563eb}
-
-    #stockAlert{display:none;background:rgba(239,68,68,.1);border:1px solid #ef4444;border-radius:6px;padding:10px 14px;margin-bottom:12px;color:#ef4444;font-size:13px}
-    .products{background:#111936;border:1px solid #1e2d5a;border-radius:10px;padding:16px}
-    .products h3{font-size:14px;font-weight:600;margin-bottom:10px}
-    .separator{height:1px;background:#1e2d5a;margin-bottom:10px}
-    #productsTable th{background:transparent;padding:10px 8px;font-size:12px;text-transform:uppercase;color:#a0aec0;border-bottom:1px solid #1e2d5a}
-    #productsTable td{padding:10px 8px;border-bottom:1px dashed #1e2d5a}
-    .add-product{margin-top:10px;color:#3b82f6;cursor:pointer;font-size:13px;display:inline-block}
-    .add-product:hover{text-decoration:underline}
-
-    @media (max-width:768px){.navbar{padding:0 16px}.nav-links{gap:14px}.main{padding:20px 16px}.search{right:16px;top:76px;width:200px}.form-grid{grid-template-columns:1fr}}
-  </style>
-  <link rel="stylesheet" href="/css/ui.css" />
+  <title>Deliveries</title>
+  <link rel="stylesheet" href="/css/app.css" />
 </head>
 <body>
-  <nav class="navbar">
-    <ul class="nav-links">
-      <li><a href="/pages/dashboard.html">Dashboard</a></li>
-      <li class="active">
-        <button class="nav-btn" data-dropdown="opsDropdown">Operations <span class="arrow">▾</span></button>
-        <div class="dropdown" id="opsDropdown"><a href="/pages/receipts.html">Receipts</a><a href="/pages/deliveries.html">Deliveries</a></div>
-      </li>
-      <li><a href="/pages/stock.html">Stock</a></li>
-      <li><a href="/pages/history.html">Move History</a></li>
-      <li>
-        <button class="nav-btn" data-dropdown="settingsDropdown">Settings <span class="arrow">▾</span></button>
-        <div class="dropdown" id="settingsDropdown"><a href="/pages/warehouse.html">Warehouse</a><a href="/pages/locations.html">Locations</a></div>
-      </li>
-    </ul>
-    <div class="nav-right">
-      <span class="nav-title">Delivery</span>
-      <button class="avatar" id="avatarBtn">A</button>
-      <div class="avatar-menu" id="avatarMenu"><a href="#">My Profile</a><button id="logoutBtn">Logout</button></div>
-    </div>
-  </nav>
+  <div id="app"></div>
+  <script type="module">
+    import { api } from '/js/api.js'
+    import { checkAuth } from '/js/auth.js'
+    import { renderAppShell } from '/js/layout.js'
 
-  <main class="main">
-    <section id="listView" class="list-view">
-      <div class="header">
-        <div class="header-left">
-          <button class="new-btn" id="newBtn">NEW</button>
-          <h1 class="title">Delivery</h1>
-        </div>
-        <div class="header-right">
-          <button class="icon-btn" id="toggleSearch">🔍</button>
-          <button class="icon-btn" title="List view">☰</button>
-          <button class="icon-btn" title="Kanban view">▦</button>
-        </div>
-      </div>
+    const _token = localStorage.getItem('token')
+    const _user = JSON.parse(localStorage.getItem('user') || '{}')
+    if (!_token) window.location.href = '/pages/login.html'
+    checkAuth()
 
-      <input id="deliverySearch" class="search" placeholder="Search by reference/contact" />
-
-      <div class="table-wrap">
-        <div id="deliverySkeleton" class="skeleton">
-          <div class="sk-row"><div class="sk-bar w1"></div><div class="sk-bar w2"></div><div class="sk-bar w3"></div><div class="sk-bar w4"></div></div>
-          <div class="sk-row"><div class="sk-bar w1"></div><div class="sk-bar w2"></div><div class="sk-bar w3"></div><div class="sk-bar w4"></div></div>
-          <div class="sk-row"><div class="sk-bar w1"></div><div class="sk-bar w2"></div><div class="sk-bar w3"></div><div class="sk-bar w4"></div></div>
-        </div>
-        <table id="deliveryTable" style="display:none">
-          <thead><tr><th>Reference</th><th>From</th><th>To</th><th>Contact</th><th>Schedule Date</th><th>Status</th></tr></thead>
-          <tbody id="deliveryBody"></tbody>
-        </table>
-        <div id="deliveryEmpty" class="empty">No deliveries found</div>
-      </div>
-    </section>
-
-    <section id="detailView" class="detail-view">
-      <span id="backToList" class="back-link">← Back to Deliveries</span>
-
-      <div class="detail-top">
-        <div class="btn-row">
-          <button id="validateBtn" class="btn btn-primary">Validate</button>
-          <button id="printBtn" class="btn btn-outline">Print</button>
-          <button id="cancelBtn" class="btn btn-outline">Cancel</button>
-        </div>
-
-        <div class="flow" id="statusFlow">
-          <span class="flow-pill" data-step="Draft">Draft</span>
-          <span class="flow-pill" data-step="Waiting">Waiting</span>
-          <span class="flow-pill" data-step="Ready">Ready</span>
-          <span class="flow-pill" data-step="Done">Done</span>
-        </div>
-      </div>
-
-      <h2 id="deliveryRef" class="doc-ref">WH/OUT/0001</h2>
-
-      <div class="form-grid">
-        <div>
-          <label class="label" for="deliveryAddress">Delivery Address</label>
-          <input id="deliveryAddress" class="input" placeholder="Delivery address" />
-        </div>
-        <div>
-          <label class="label" for="scheduleDate">Schedule Date</label>
-          <input id="scheduleDate" class="input" type="date" />
-        </div>
-        <div>
-          <label class="label" for="responsible">Responsible</label>
-          <input id="responsible" class="input" />
-        </div>
-        <div>
-          <label class="label" for="operationType">Operation Type</label>
-          <select id="operationType" class="select">
-            <option>Delivery</option>
-            <option>Return</option>
-            <option>Internal Transfer</option>
-          </select>
-        </div>
-      </div>
-
-      <section class="products">
-        <h3>Products</h3>
-        <div class="separator"></div>
-        <div id="stockAlert">⚠ One or more products are out of stock. Status set to Waiting.</div>
-        <table id="productsTable">
-          <thead><tr><th>Product</th><th>Quantity</th></tr></thead>
-          <tbody id="productsBody"></tbody>
-        </table>
-        <span id="addProductRow" class="add-product">Add New Product</span>
+    const page = renderAppShell({ title: 'Deliveries', activeKey: 'operations' })
+    page.innerHTML = `
+      <section class="card">
+        <form class="inline" id="delivery-form">
+          <input id="customer-name" placeholder="Customer Name" required />
+          <select id="delivery-product" required></select>
+          <input id="delivery-qty" type="number" min="1" placeholder="Quantity" required />
+          <button type="submit">Create Delivery</button>
+        </form>
       </section>
-    </section>
-  </main>
+      <section class="card">
+        <form class="inline">
+          <select id="status-filter">
+            <option value="">All / Status</option>
+            <option value="DRAFT">DRAFT</option>
+            <option value="WAITING">WAITING</option>
+            <option value="READY">READY</option>
+            <option value="DONE">DONE</option>
+            <option value="CANCELLED">CANCELLED</option>
+          </select>
+        </form>
+      </section>
+      <div id="error"></div>
+      <div id="loading">Loading...</div>
+      <section class="card" id="delivery-card" style="display:none;">
+        <table>
+          <thead><tr><th>Reference</th><th>Customer</th><th>Status</th><th>Created By</th><th>Actions</th></tr></thead>
+          <tbody id="delivery-body"></tbody>
+        </table>
+      </section>
+    `
 
-  <script src="/js/config.js"></script>
-  <script>
-    function requireAuth(){
-      let token = localStorage.getItem('token');
-      if (!token) {
-        const isLocalHost = location.hostname === '127.0.0.1' || location.hostname === 'localhost';
-        if (isLocalHost) {
-          localStorage.setItem('token', 'demo-token');
-          if (!localStorage.getItem('user_name')) localStorage.setItem('user_name', 'Admin');
-          token = localStorage.getItem('token');
-        } else {
-          location.replace('/index.html');
+    const errorBox = document.getElementById('error')
+    const loading = document.getElementById('loading')
+
+    function showError(message) {
+      errorBox.style.display = 'block'
+      errorBox.textContent = message || 'Failed to load data. Please try again.'
+    }
+
+    async function loadProducts() {
+      const res = await api.getProducts()
+      if (!res?.success) return
+      const select = document.getElementById('delivery-product')
+      select.innerHTML = '<option value="">Select Product</option>'
+      res.data.forEach((p) => {
+        const option = document.createElement('option')
+        option.value = p.id
+        option.textContent = `${p.name} (${p.sku})`
+        select.appendChild(option)
+      })
+    }
+
+    function renderRows(rows) {
+      const body = document.getElementById('delivery-body')
+      body.innerHTML = ''
+      rows.forEach((r) => {
+        const tr = document.createElement('tr')
+        tr.innerHTML = `<td>${r.reference || '-'}</td><td>${r.customer_name || '-'}</td><td><span class="badge status-${r.status}">${r.status}</span></td><td>${r.created_by_name || '-'}</td><td><button data-validate="${r.id}">Validate</button> <button class="secondary" data-cancel="${r.id}">Cancel</button></td>`
+        body.appendChild(tr)
+      })
+      document.getElementById('delivery-card').style.display = 'block'
+    }
+
+    async function loadDeliveries(status = '') {
+      loading.style.display = 'block'
+      const res = await api.getDeliveries(status)
+      loading.style.display = 'none'
+      if (!res?.success) {
+        showError(res?.message)
+        return
+      }
+      renderRows(res.data || [])
+    }
+
+    document.getElementById('status-filter').addEventListener('change', async (event) => {
+      await loadDeliveries(event.target.value)
+    })
+
+    document.getElementById('delivery-form').addEventListener('submit', async (event) => {
+      event.preventDefault()
+      const payload = {
+        customer_name: document.getElementById('customer-name').value.trim(),
+        items: [{ product_id: Number(document.getElementById('delivery-product').value), quantity: Number(document.getElementById('delivery-qty').value) }]
+      }
+      const res = await api.createDelivery(payload)
+      if (!res?.success) {
+        showError(res?.message || 'Failed to create delivery')
+        return
+      }
+      event.target.reset()
+      await loadDeliveries(document.getElementById('status-filter').value)
+    })
+
+    document.getElementById('delivery-body').addEventListener('click', async (event) => {
+      const validateId = event.target.getAttribute('data-validate')
+      const cancelId = event.target.getAttribute('data-cancel')
+      if (validateId) {
+        const res = await api.validateDelivery(validateId)
+        if (!res?.success) {
+          showError(res?.message || 'Validation failed')
+          return
         }
       }
-      return token;
-    }
-    const token = requireAuth();
-
-    const userName = localStorage.getItem('user_name') || 'Admin';
-    document.getElementById('avatarBtn').textContent = userName.charAt(0).toUpperCase();
-    document.getElementById('responsible').value = userName;
-
-    const avatarBtn = document.getElementById('avatarBtn');
-    const avatarMenu = document.getElementById('avatarMenu');
-    avatarBtn.addEventListener('click',(e)=>{e.stopPropagation();avatarMenu.classList.toggle('open')});
-    document.addEventListener('click',()=>avatarMenu.classList.remove('open'));
-    document.getElementById('logoutBtn').addEventListener('click',()=>{localStorage.clear();location.replace('/index.html')});
-
-    document.querySelectorAll('.nav-btn[data-dropdown]').forEach((btn)=>{
-      btn.addEventListener('click',(e)=>{
-        e.stopPropagation();
-        const li=btn.closest('li');
-        const open=li.classList.contains('open');
-        document.querySelectorAll('.nav-links li.open').forEach((item)=>item.classList.remove('open'));
-        if(!open) li.classList.add('open');
-      });
-    });
-    document.addEventListener('click',()=>document.querySelectorAll('.nav-links li.open').forEach((item)=>item.classList.remove('open')));
-
-    const listView = document.getElementById('listView');
-    const detailView = document.getElementById('detailView');
-    const searchInput = document.getElementById('deliverySearch');
-    const bodyEl = document.getElementById('deliveryBody');
-    const tableEl = document.getElementById('deliveryTable');
-    const emptyEl = document.getElementById('deliveryEmpty');
-    const refEl = document.getElementById('deliveryRef');
-    const productsBody = document.getElementById('productsBody');
-    const stockAlert = document.getElementById('stockAlert');
-
-    let deliveries = [];
-    let currentDelivery = null;
-
-    function formatDate(value){
-      if(!value) return '';
-      const d = new Date(value);
-      if(Number.isNaN(d.getTime())) return '';
-      const dd=String(d.getDate()).padStart(2,'0');
-      const mm=String(d.getMonth()+1).padStart(2,'0');
-      const yy=d.getFullYear();
-      return `${dd}/${mm}/${yy}`;
-    }
-
-    function statusClass(status){
-      const s = String(status||'Draft').toLowerCase();
-      if(s==='ready') return 'st-ready';
-      if(s==='done') return 'st-done';
-      if(s==='waiting') return 'st-waiting';
-      return 'st-draft';
-    }
-
-    function renderList(rows){
-      bodyEl.innerHTML = '';
-      if(!rows.length){ tableEl.style.display='none'; emptyEl.style.display='block'; return; }
-      emptyEl.style.display='none'; tableEl.style.display='table';
-
-      rows.forEach((r)=>{
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td class="ref">${r.reference || '-'}</td>
-          <td>${r.from || '-'}</td>
-          <td>${r.to || '-'}</td>
-          <td>${r.contact || '-'}</td>
-          <td>${formatDate(r.schedule_date)}</td>
-          <td><span class="status ${statusClass(r.status)}">${r.status || 'Draft'}</span></td>
-        `;
-        tr.addEventListener('click',()=>showDetail(r.id));
-        bodyEl.appendChild(tr);
-      });
-    }
-
-    function applySearch(){
-      const q = searchInput.value.trim().toLowerCase();
-      if(!q) return renderList(deliveries);
-      renderList(deliveries.filter((r)=>String(r.reference||'').toLowerCase().includes(q)||String(r.contact||'').toLowerCase().includes(q)));
-    }
-
-    searchInput.addEventListener('input',applySearch);
-    document.getElementById('toggleSearch').addEventListener('click',()=>{
-      searchInput.classList.toggle('show');
-      if(searchInput.classList.contains('show')) searchInput.focus();
-    });
-
-    document.getElementById('newBtn').addEventListener('click',()=>{
-      currentDelivery = { id:null, reference:'WH/OUT/0001', from:'WH/Stock1', to:'Customer', contact:'', schedule_date:'', status:'Draft', items:[] };
-      fillDetail(currentDelivery);
-      listView.style.display='none';
-      detailView.style.display='block';
-    });
-
-    document.getElementById('backToList').addEventListener('click',()=>{
-      detailView.style.display='none';
-      listView.style.display='block';
-    });
-
-    function setFlow(status){
-      document.querySelectorAll('#statusFlow .flow-pill').forEach((p)=>p.classList.toggle('active', p.dataset.step===status));
-      document.getElementById('printBtn').style.display = status === 'Done' ? 'inline-block' : 'none';
-    }
-
-    function renderProducts(items){
-      const rows = items.length ? items : [{product:'',qty:1,available:10}];
-      productsBody.innerHTML='';
-      let hasOut = false;
-      rows.forEach((it)=>{
-        const out = Number(it.available ?? 99999) < Number(it.qty || 0);
-        if(out) hasOut = true;
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td><input class="input" placeholder="[SKU] Product" value="${it.product || it.name || ''}" /></td>
-          <td><input class="input qty" type="number" min="1" value="${it.qty || 1}" data-available="${it.available ?? 99999}" /></td>
-        `;
-        if(out){
-          tr.style.background='rgba(239,68,68,0.12)';
-          tr.style.borderLeft='3px solid #ef4444';
+      if (cancelId) {
+        const res = await api.cancelDelivery(cancelId)
+        if (!res?.success) {
+          showError(res?.message || 'Cancel failed')
+          return
         }
-        productsBody.appendChild(tr);
-      });
-      stockAlert.style.display = hasOut ? 'block' : 'none';
-      if(hasOut && currentDelivery) currentDelivery.status = 'Waiting';
-      setFlow(currentDelivery?.status || 'Draft');
-    }
-
-    document.getElementById('addProductRow').addEventListener('click',()=>{
-      const tr = document.createElement('tr');
-      tr.innerHTML = '<td><input class="input" placeholder="[SKU] Product" /></td><td><input class="input qty" type="number" min="1" value="1" data-available="99999" /></td>';
-      productsBody.appendChild(tr);
-      checkStockRows();
-    });
-
-    function checkStockRows(){
-      let hasOut = false;
-      document.querySelectorAll('#productsBody tr').forEach((tr)=>{
-        const qtyInput = tr.querySelector('.qty');
-        const requested = Number(qtyInput.value || 0);
-        const available = Number(qtyInput.dataset.available || 99999);
-        const out = available < requested;
-        tr.style.background = out ? 'rgba(239,68,68,0.12)' : '';
-        tr.style.borderLeft = out ? '3px solid #ef4444' : '';
-        if(out) hasOut = true;
-      });
-      stockAlert.style.display = hasOut ? 'block' : 'none';
-      if(currentDelivery){
-        if(hasOut) currentDelivery.status = 'Waiting';
-        else if(currentDelivery.status === 'Waiting') currentDelivery.status = 'Ready';
       }
-      setFlow(currentDelivery?.status || 'Draft');
-    }
+      await loadDeliveries(document.getElementById('status-filter').value)
+    })
 
-    productsBody.addEventListener('input',(e)=>{
-      if(e.target.classList.contains('qty')) checkStockRows();
-    });
-
-    function fillDetail(delivery){
-      currentDelivery = delivery;
-      refEl.textContent = delivery.reference || 'WH/OUT/0001';
-      document.getElementById('deliveryAddress').value = delivery.address || '';
-      document.getElementById('scheduleDate').value = delivery.schedule_date ? new Date(delivery.schedule_date).toISOString().slice(0,10) : '';
-      document.getElementById('responsible').value = localStorage.getItem('user_name') || 'Admin';
-      document.getElementById('operationType').value = delivery.operation_type || 'Delivery';
-      setFlow(delivery.status || 'Draft');
-      renderProducts(delivery.items || []);
-    }
-
-    document.getElementById('cancelBtn').addEventListener('click',()=>{
-      detailView.style.display='none';
-      listView.style.display='block';
-    });
-
-    document.getElementById('validateBtn').addEventListener('click',async()=>{
-      checkStockRows();
-      if(currentDelivery?.status === 'Waiting') return;
-      if(!currentDelivery?.id){ setFlow('Ready'); return; }
-      try{
-        const res = await fetch(apiUrl(`/api/deliveries/${currentDelivery.id}/validate`),{method:'POST',headers:{Authorization:'Bearer '+token}});
-        if(!res.ok) throw new Error();
-        const data = await res.json();
-        currentDelivery.status = data.status || (currentDelivery.status==='Draft'?'Ready':'Done');
-      }catch{
-        currentDelivery.status = currentDelivery.status==='Draft'?'Ready':'Done';
-      }
-      setFlow(currentDelivery.status);
-      await loadDeliveries();
-    });
-
-    function showDetail(id){
-      const delivery = deliveries.find((r)=>r.id===id);
-      if(!delivery) return;
-      fillDetail(delivery);
-      listView.style.display='none';
-      detailView.style.display='block';
-    }
-
-    async function loadDeliveries(){
-      document.getElementById('deliverySkeleton').style.display='block';
-      try{
-        const res = await fetch(apiUrl('/api/deliveries'),{headers:{Authorization:'Bearer '+token}});
-        if(!res.ok) throw new Error();
-        deliveries = await res.json();
-      }catch{
-        deliveries = [
-          { id:1, reference:'WH/OUT/0001', from:'WH/Stock1', to:'Customer A', contact:'City Store', schedule_date:'2026-03-17', status:'Draft', address:'Market Road', operation_type:'Delivery', items:[{product:'[DESK001] Desk', qty:5, available:3}] },
-          { id:2, reference:'WH/OUT/0002', from:'WH/Stock2', to:'Customer B', contact:'Office World', schedule_date:'2026-03-18', status:'Ready', address:'Ring Road', operation_type:'Delivery', items:[{product:'[CHR008] Chair', qty:2, available:10}] }
-        ];
-      }finally{
-        document.getElementById('deliverySkeleton').style.display='none';
-        renderList(deliveries);
-      }
-    }
-
-    loadDeliveries();
+    await loadProducts()
+    await loadDeliveries()
   </script>
-  <script src="/js/ui.js"></script>
 </body>
 </html>

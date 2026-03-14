@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard - Admin</title>
+  <link rel="stylesheet" href="/css/app.css" />
+</head>
+<body>
+  <div id="app"></div>
+  <script type="module">
+    import { api } from '/js/api.js'
+    import { requireAdmin } from '/js/auth.js'
+    import { renderAppShell } from '/js/layout.js'
+
+    const _token = localStorage.getItem('token')
+    const _user = JSON.parse(localStorage.getItem('user') || '{}')
+    if (!_token) window.location.href = '/pages/login.html'
+    if (!_user || _user.role !== 'admin') window.location.href = '/pages/dashboard-staff.html'
+
+    const user = requireAdmin()
+    if (!user) throw new Error('admin required')
+
+    const page = renderAppShell({ title: 'Dashboard', activeKey: 'dashboard' })
+    page.innerHTML = `
+      <div id="error"></div>
+      <div id="loading">Loading...</div>
+      <section class="kpi-grid" id="kpis" style="display:none;"></section>
+      <section class="grid-3" id="ops" style="display:none; margin-top:12px;"></section>
+      <section class="grid-2" id="meta" style="display:none; margin-top:12px;"></section>
+      <section class="card" id="activity-card" style="display:none;">
+        <h3>Recent Activity</h3>
+        <table>
+          <thead><tr><th>Product</th><th>Type</th><th>Qty</th><th>Location</th><th>Date</th></tr></thead>
+          <tbody id="activity-body"></tbody>
+        </table>
+      </section>
+    `
+
+    const errorBox = document.getElementById('error')
+    const loading = document.getElementById('loading')
+
+    function showError(message) {
+      errorBox.style.display = 'block'
+      errorBox.textContent = message || 'Failed to load data. Please try again.'
+    }
+
+    function statusCount(items) {
+      const map = { DRAFT: 0, WAITING: 0, READY: 0, DONE: 0 }
+      for (const row of items || []) {
+        if (map[row.status] != null) map[row.status] += 1
+      }
+      return map
+    }
+
+    function locationName(row) {
+      return row.destination_name || row.source_name || '-'
+    }
+
+    try {
+      const [dash, receipts, deliveries, transfers, warehouses, moves, users] = await Promise.all([
+        api.getDashboard(),
+        api.getReceipts(),
+        api.getDeliveries(),
+        api.getTransfers(),
+        api.getWarehouses(),
+        api.getMoves(),
+        api.getUsers()
+      ])
+
+      loading.style.display = 'none'
+
+      if (!dash?.success) {
+        showError(dash?.message)
+        throw new Error('dashboard load failed')
+      }
+
+      const kpi = document.getElementById('kpis')
+      kpi.innerHTML = `
+        <div class="kpi-card kpi-blue" onclick="location.href='/pages/products.html'"><div>Total Products</div><h2>${dash.data.totalProducts}</h2></div>
+        <div class="kpi-card kpi-amber" onclick="location.href='/pages/inventory.html?status=low'"><div>Low Stock Items</div><h2>${dash.data.lowStock}</h2></div>
+        <div class="kpi-card kpi-green" onclick="location.href='/pages/receipts.html'"><div>Pending Receipts</div><h2>${dash.data.pendingReceipts}</h2></div>
+        <div class="kpi-card kpi-teal" onclick="location.href='/pages/deliveries.html'"><div>Pending Deliveries</div><h2>${dash.data.pendingDeliveries}</h2></div>
+      `
+      kpi.style.display = 'grid'
+
+      const receiptStats = statusCount(receipts?.data || [])
+      const deliveryStats = statusCount(deliveries?.data || [])
+      const transferStats = statusCount(transfers?.data || [])
+
+      const ops = document.getElementById('ops')
+      ops.innerHTML = `
+        <article class="card summary-card"><h3>Receipts</h3><p>Draft ${receiptStats.DRAFT} · Waiting ${receiptStats.WAITING} · Ready ${receiptStats.READY} · Done ${receiptStats.DONE}</p><button onclick="location.href='/pages/receipts.html'">${(receipts?.total || 0)} to Receive</button></article>
+        <article class="card summary-card teal"><h3>Deliveries</h3><p>Draft ${deliveryStats.DRAFT} · Waiting ${deliveryStats.WAITING} · Ready ${deliveryStats.READY} · Done ${deliveryStats.DONE}</p><button onclick="location.href='/pages/deliveries.html'">${(deliveries?.total || 0)} to Deliver</button></article>
+        <article class="card summary-card blue"><h3>Transfers</h3><p>Draft ${transferStats.DRAFT} · Waiting ${transferStats.WAITING} · Ready ${transferStats.READY} · Done ${transferStats.DONE}</p><button onclick="location.href='/pages/move-history.html?type=TRANSFER'">${(transfers?.total || 0)} Transfers</button></article>
+      `
+      ops.style.display = 'grid'
+
+      const warehouseCount = warehouses?.total || 0
+      let locationCount = 0
+      if (warehouses?.success) {
+        for (const wh of warehouses.data) {
+          const locs = await api.getLocations(wh.id)
+          if (locs?.success) locationCount += locs.total || 0
+        }
+      }
+
+      const meta = document.getElementById('meta')
+      const userCount = users?.success ? (users.total || (users.data || []).length || 0) : 0
+      meta.innerHTML = `
+        <article class="card"><h3>User Management</h3><p>${userCount} users available in system.</p><button onclick="location.href='/pages/users-admin.html'">Manage Users</button></article>
+        <article class="card"><h3>Warehouse Overview</h3><p>${warehouseCount} warehouses · ${locationCount} locations</p><button onclick="location.href='/pages/settings.html'">Manage Warehouses</button></article>
+      `
+      meta.style.display = 'grid'
+
+      const body = document.getElementById('activity-body')
+      body.innerHTML = ''
+      ;(moves?.data || []).slice(0, 10).forEach((row) => {
+        const tr = document.createElement('tr')
+        tr.innerHTML = `<td>${row.product_name || '-'}</td><td><span class="badge status-${row.movement_type}">${row.movement_type}</span></td><td>${row.quantity}</td><td>${locationName(row)}</td><td>${row.created_at ? new Date(row.created_at).toLocaleString() : '-'}</td>`
+        body.appendChild(tr)
+      })
+      document.getElementById('activity-card').style.display = 'block'
+    } catch (err) {
+      loading.style.display = 'none'
+      showError(err.message || 'Failed to load. Check your connection.')
+    }
+  </script>
+</body>
+</html>
