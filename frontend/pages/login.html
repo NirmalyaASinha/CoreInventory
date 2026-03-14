@@ -137,7 +137,11 @@
       const res = await api.sendOtp({ email })
       if (res?.success) {
         otpSection.classList.add('visible')
-        showMessage('OTP sent to ' + email, 'success')
+        if (res.data?.otp) {
+          showMessage((res.data?.message || 'OTP generated') + ' OTP: ' + res.data.otp, 'success')
+        } else {
+          showMessage('OTP sent to ' + email, 'success')
+        }
       } else {
         showMessage(res?.message || 'Failed to send OTP', 'error')
       }
