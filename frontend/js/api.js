@@ -1,4 +1,6 @@
-const API_URL = 'http://localhost:5000/api'
+const isLocalHost = ['localhost', '127.0.0.1'].includes(window.location.hostname)
+const API_ORIGIN = isLocalHost ? 'http://localhost:5000' : 'https://coreinventory-bjqx.onrender.com'
+const API_URL = API_ORIGIN + '/api'
 
 function getToken() {
 	return localStorage.getItem('token')
@@ -83,7 +85,7 @@ export const api = {
 	createLocation: (warehouseId, body) => apiFetch('/warehouses/' + warehouseId + '/locations', { method: 'POST', body: JSON.stringify(body) })
 	,
 	getUsers: async () => {
-		const res = await fetch('http://localhost:5000/test-users', {
+		const res = await fetch(API_ORIGIN + '/test-users', {
 			headers: getHeaders()
 		})
 		const data = await res.json()
