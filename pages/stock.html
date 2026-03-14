@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CoreInventory — Stock</title>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{min-height:100vh;background:#0a0f2e;color:#fff;font-family:'Segoe UI',system-ui,-apple-system,sans-serif}
+
+    .navbar{position:fixed;top:0;left:0;right:0;height:56px;background:#111936;border-bottom:1px solid #1e2d5a;display:flex;align-items:center;justify-content:space-between;padding:0 32px;z-index:1000}
+    .nav-links{display:flex;align-items:center;gap:28px;list-style:none}
+    .nav-links li{position:relative}
+    .nav-links a,.nav-links .nav-btn{background:none;border:none;height:56px;display:flex;align-items:center;gap:4px;color:#a0aec0;text-decoration:none;cursor:pointer;font-size:14px;font-family:inherit;border-bottom:2px solid transparent;transition:.15s}
+    .nav-links a:hover,.nav-links .nav-btn:hover{color:#fff}
+    .nav-links li.active>a,.nav-links li.active>.nav-btn{color:#fff;border-bottom-color:#2563eb}
+    .arrow{font-size:10px;opacity:.7;transition:transform .2s}
+    .nav-links li:hover .arrow,.nav-links li.open .arrow{transform:rotate(180deg)}
+    .dropdown{display:none;position:absolute;left:0;top:calc(100% + 1px);min-width:160px;background:#1a2347;border:1px solid #1e2d5a;border-radius:8px;padding:8px 0;box-shadow:0 8px 24px rgba(0,0,0,.4);z-index:200}
+    .nav-links li:hover .dropdown,.nav-links li.open .dropdown{display:block}
+    .dropdown a{display:block;padding:10px 16px;color:#a0aec0;text-decoration:none;font-size:13px}
+    .dropdown a:hover{background:#2563eb;color:#fff}
+    .nav-right{display:flex;align-items:center;gap:12px;position:relative}
+    .nav-title{font-size:15px;font-weight:700}
+    .avatar{width:34px;height:34px;border-radius:50%;border:0;background:#2563eb;color:#fff;font-size:13px;font-weight:700;cursor:pointer}
+    .avatar-menu{display:none;position:absolute;right:0;top:calc(100% + 10px);min-width:150px;background:#1a2347;border:1px solid #1e2d5a;border-radius:8px;padding:8px 0;z-index:300}
+    .avatar-menu.open{display:block}
+    .avatar-menu a,.avatar-menu button{display:block;width:100%;padding:10px 16px;color:#a0aec0;background:none;border:none;text-decoration:none;text-align:left;cursor:pointer;font-size:13px}
+    .avatar-menu a:hover,.avatar-menu button:hover{background:#2563eb;color:#fff}
+
+    .main{margin-top:56px;padding:32px;position:relative}
+    .header-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px}
+    .page-title{font-size:28px;font-weight:600;color:#fff}
+    .icon-btn{width:36px;height:36px;border-radius:50%;border:none;background:#1a2347;color:#fff;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center}
+
+    .search-input{position:absolute;right:32px;top:80px;width:240px;background:#1a2347;color:#fff;border:1px solid #2563eb;border-radius:6px;padding:8px 12px;opacity:0;transform:translateY(-8px);pointer-events:none;transition:opacity .2s,transform .2s;z-index:10}
+    .search-input.show{opacity:1;transform:translateY(0);pointer-events:auto}
+    .search-input::placeholder{color:#4a5568}
+
+    .table-wrap{background:#111936;border:1px solid #1e2d5a;border-radius:10px;overflow:hidden}
+    table{width:100%;border-collapse:collapse}
+    thead th{background:#1a2347;color:#a0aec0;font-size:11px;text-transform:uppercase;letter-spacing:.06em;padding:12px 16px;text-align:left;border-bottom:1px solid #1e2d5a}
+    tbody tr{border-bottom:1px dashed #1e2d5a}
+    tbody tr:hover{background:#1a2347}
+    tbody td{padding:14px 16px;font-size:14px;color:#fff;vertical-align:middle}
+    .prod-name{font-size:14px;color:#fff}
+    .prod-sku{font-size:12px;color:#a0aec0;font-family:monospace;margin-top:4px}
+    .action-cell{width:70px;text-align:right}
+    .action-btn{background:none;border:none;color:#2563eb;font-size:16px;cursor:pointer;visibility:hidden}
+    tbody tr:hover .action-btn{visibility:visible}
+
+    .skeleton{padding:0 16px}
+    .sk-row{height:48px;display:flex;align-items:center;border-bottom:1px dashed #1e2d5a}
+    .sk-bar{height:12px;border-radius:8px;background:#2a3660;position:relative;overflow:hidden}
+    .sk-bar::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.08),transparent);animation:shimmer 1.2s infinite}
+    .w1{width:36%}.w2{width:18%;margin-left:12%}.w3{width:10%;margin-left:10%}
+    @keyframes shimmer{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
+
+    .empty-state{display:none;color:#a0aec0;text-align:center;padding:40px;font-size:14px}
+    .low-stock{border-left:3px solid #f59e0b}
+    .out-stock{border-left:3px solid #ef4444}
+    .out-badge{display:inline-block;margin-left:8px;padding:2px 8px;border-radius:999px;background:rgba(239,68,68,.2);color:#ef4444;font-size:11px;border:1px solid #ef4444}
+
+    @media (max-width:768px){.navbar{padding:0 16px}.nav-links{gap:14px}.main{padding:20px 16px}.search-input{right:16px;top:74px;width:200px}}
+  </style>
+  <link rel="stylesheet" href="/css/ui.css" />
+</head>
+<body>
+  <nav class="navbar">
+    <ul class="nav-links">
+      <li><a href="/pages/dashboard.html">Dashboard</a></li>
+      <li>
+        <button class="nav-btn" data-dropdown="opsDropdown">Operations <span class="arrow">▾</span></button>
+        <div class="dropdown" id="opsDropdown">
+          <a href="/pages/receipts.html">Receipts</a>
+          <a href="/pages/deliveries.html">Deliveries</a>
+        </div>
+      </li>
+      <li class="active"><a href="/pages/stock.html">Stock</a></li>
+      <li><a href="/pages/history.html">Move History</a></li>
+      <li>
+        <button class="nav-btn" data-dropdown="settingsDropdown">Settings <span class="arrow">▾</span></button>
+        <div class="dropdown" id="settingsDropdown">
+          <a href="/pages/warehouse.html">Warehouse</a>
+          <a href="/pages/locations.html">Locations</a>
+        </div>
+      </li>
+    </ul>
+    <div class="nav-right">
+      <span class="nav-title">Stock</span>
+      <button class="avatar" id="avatarBtn">A</button>
+      <div class="avatar-menu" id="avatarMenu">
+        <a href="#">My Profile</a>
+        <button id="logoutBtn">Logout</button>
+      </div>
+    </div>
+  </nav>
+
+  <main class="main">
+    <div class="header-row">
+      <h1 class="page-title">Stock</h1>
+      <button class="icon-btn" id="searchToggle" aria-label="Search">🔍</button>
+    </div>
+    <input id="searchInput" class="search-input" placeholder="Search product or SKU" />
+
+    <div class="table-wrap">
+      <div id="stockSkeleton" class="skeleton">
+        <div class="sk-row"><div class="sk-bar w1"></div><div class="sk-bar w2"></div><div class="sk-bar w3"></div></div>
+        <div class="sk-row"><div class="sk-bar w1"></div><div class="sk-bar w2"></div><div class="sk-bar w3"></div></div>
+        <div class="sk-row"><div class="sk-bar w1"></div><div class="sk-bar w2"></div><div class="sk-bar w3"></div></div>
+      </div>
+
+      <table id="stockTable" style="display:none">
+        <thead>
+          <tr>
+            <th>Product</th>
+            <th>Per Unit Cost</th>
+            <th>On Hand</th>
+            <th>Free to Use</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="stockBody"></tbody>
+      </table>
+
+      <div id="emptyState" class="empty-state">No products found</div>
+    </div>
+  </main>
+
+  <script src="/js/config.js"></script>
+  <script>
+    let token = localStorage.getItem('token');
+    if (!token) {
+      const isLocalHost = location.hostname === '127.0.0.1' || location.hostname === 'localhost';
+      if (isLocalHost) {
+        localStorage.setItem('token', 'demo-token');
+        if (!localStorage.getItem('user_name')) localStorage.setItem('user_name', 'Admin');
+        token = localStorage.getItem('token');
+      } else {
+        location.replace('/index.html');
+      }
+    }
+    const userName = localStorage.getItem('user_name') || 'Admin';
+    document.getElementById('avatarBtn').textContent = userName.charAt(0).toUpperCase();
+
+    const avatarBtn = document.getElementById('avatarBtn');
+    const avatarMenu = document.getElementById('avatarMenu');
+    avatarBtn.addEventListener('click', (e) => { e.stopPropagation(); avatarMenu.classList.toggle('open'); });
+    document.addEventListener('click', () => avatarMenu.classList.remove('open'));
+    document.getElementById('logoutBtn').addEventListener('click', () => { localStorage.clear(); location.replace('/index.html'); });
+
+    document.querySelectorAll('.nav-btn[data-dropdown]').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const li = btn.closest('li');
+        const open = li.classList.contains('open');
+        document.querySelectorAll('.nav-links li.open').forEach((item) => item.classList.remove('open'));
+        if (!open) li.classList.add('open');
+      });
+    });
+    document.addEventListener('click', () => document.querySelectorAll('.nav-links li.open').forEach((item) => item.classList.remove('open')));
+
+    const searchInput = document.getElementById('searchInput');
+    document.getElementById('searchToggle').addEventListener('click', () => {
+      searchInput.classList.toggle('show');
+      if (searchInput.classList.contains('show')) searchInput.focus();
+    });
+
+    let allProducts = [];
+
+    function renderTable(products) {
+      const tbody = document.getElementById('stockBody');
+      const table = document.getElementById('stockTable');
+      const empty = document.getElementById('emptyState');
+      tbody.innerHTML = '';
+
+      if (!products.length) {
+        table.style.display = 'none';
+        empty.style.display = 'block';
+        return;
+      }
+
+      empty.style.display = 'none';
+      table.style.display = 'table';
+
+      products.forEach((item) => {
+        const tr = document.createElement('tr');
+        if (item.on_hand === 0) tr.classList.add('out-stock');
+        else if (item.on_hand > 0 && item.on_hand < 10) tr.classList.add('low-stock');
+
+        tr.innerHTML = `
+          <td>
+            <div class="prod-name">${item.name}${item.on_hand === 0 ? '<span class="out-badge">Out of Stock</span>' : ''}</div>
+            <div class="prod-sku">${item.sku}</div>
+          </td>
+          <td>${item.cost} Rs</td>
+          <td>${item.on_hand}</td>
+          <td>${item.free_to_use}</td>
+          <td class="action-cell"><button class="action-btn" title="Edit">✏️</button></td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function filterProducts() {
+      const q = searchInput.value.trim().toLowerCase();
+      if (!q) return renderTable(allProducts);
+      const filtered = allProducts.filter((p) => p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q));
+      renderTable(filtered);
+    }
+
+    searchInput.addEventListener('input', filterProducts);
+
+    async function loadProducts() {
+      const skeleton = document.getElementById('stockSkeleton');
+      skeleton.style.display = 'block';
+      try {
+        const res = await fetch(apiUrl('/api/products'), { headers: { Authorization: 'Bearer ' + token } });
+        if (!res.ok) throw new Error('load failed');
+        const data = await res.json();
+        allProducts = data.map((p) => ({
+          id: p.id,
+          name: p.name,
+          sku: p.sku,
+          cost: p.cost || 3000,
+          on_hand: Number(p.on_hand ?? p.qty ?? 0),
+          free_to_use: Number(p.free_to_use ?? p.qty ?? 0)
+        }));
+      } catch {
+        allProducts = [
+          { id: 1, name: 'Desk', sku: 'DESK001', cost: 3000, on_hand: 12, free_to_use: 8 },
+          { id: 2, name: 'Office Chair', sku: 'CHR008', cost: 3000, on_hand: 0, free_to_use: 0 }
+        ];
+      } finally {
+        skeleton.style.display = 'none';
+        renderTable(allProducts);
+      }
+    }
+
+    loadProducts();
+  </script>
+  <script src="/js/ui.js"></script>
+</body>
+</html>
