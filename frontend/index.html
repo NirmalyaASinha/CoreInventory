@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CoreInventory — Login</title>
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      min-height: 100vh;
+      background: #0a0f2e;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    /* ── Card ── */
+    .card {
+      width: 100%;
+      max-width: 420px;
+      background: #111936;
+      border: 1px solid #1e2d5a;
+      border-radius: 12px;
+      padding: 40px;
+    }
+
+    /* ── Logo ── */
+    .logo {
+      border-left: 3px solid #2563eb;
+      padding: 10px 14px;
+      margin-bottom: 28px;
+      background: rgba(37, 99, 235, 0.06);
+      border-radius: 0 6px 6px 0;
+    }
+
+    .logo span {
+      display: block;
+      font-size: 1.18rem;
+      font-weight: 700;
+      color: #ffffff;
+      letter-spacing: 0.02em;
+    }
+
+    .logo small {
+      display: block;
+      font-size: 0.75rem;
+      color: #a0aec0;
+      margin-top: 2px;
+    }
+
+    /* ── Tabs ── */
+    .tabs {
+      display: flex;
+      border-bottom: 1px solid #1e2d5a;
+      margin-bottom: 28px;
+    }
+
+    .tab-btn {
+      flex: 1;
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      padding: 10px 0;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #a0aec0;
+      cursor: pointer;
+      transition: color 0.18s, border-color 0.18s;
+    }
+
+    .tab-btn.active {
+      color: #ffffff;
+      border-bottom-color: #2563eb;
+    }
+
+    .tab-btn:hover:not(.active) {
+      color: #cbd5e0;
+    }
+
+    /* ── Forms ── */
+    .form-panel {
+      display: none;
+      animation: fadeIn 0.2s ease;
+    }
+
+    .form-panel.visible {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to   { opacity: 1; transform: translateY(0);   }
+    }
+
+    .field {
+      margin-bottom: 16px;
+    }
+
+    .field label {
+      display: block;
+      color: #a0aec0;
+      font-size: 13px;
+      margin-bottom: 6px;
+    }
+
+    .field input {
+      width: 100%;
+      background: #1a2347;
+      color: #ffffff;
+      border: 1px solid #1e2d5a;
+      border-radius: 6px;
+      padding: 10px 12px;
+      font-size: 0.9rem;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.18s, box-shadow 0.18s;
+    }
+
+    .field input::placeholder {
+      color: #4a5568;
+    }
+
+    .field input:focus {
+      border-color: #2563eb;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+    }
+
+    .field input.error {
+      border-color: #ef4444;
+    }
+
+    .field input.error:focus {
+      box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2);
+    }
+
+    /* ── Field-level error ── */
+    .field-error {
+      display: none;
+      color: #ef4444;
+      font-size: 12px;
+      margin-top: 5px;
+    }
+
+    /* ── Buttons ── */
+    .btn-primary {
+      width: 100%;
+      background: #2563eb;
+      color: #ffffff;
+      border: none;
+      border-radius: 6px;
+      padding: 11px;
+      font-size: 0.9rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      cursor: pointer;
+      transition: background 0.18s;
+      margin-top: 4px;
+    }
+
+    .btn-primary:hover {
+      background: #3b82f6;
+    }
+
+    .btn-primary:active {
+      background: #1d4ed8;
+    }
+
+    /* ── Form-level error ── */
+    .form-error {
+      display: none;
+      color: #ef4444;
+      font-size: 13px;
+      margin-top: 12px;
+      padding: 8px 10px;
+      background: rgba(239, 68, 68, 0.08);
+      border: 1px solid rgba(239, 68, 68, 0.25);
+      border-radius: 6px;
+    }
+
+    /* ── Footer links ── */
+    .form-footer {
+      display: flex;
+      justify-content: center;
+      gap: 18px;
+      margin-top: 18px;
+    }
+
+    .form-footer a {
+      color: #a0aec0;
+      font-size: 13px;
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+
+    .form-footer a:hover {
+      color: #ffffff;
+      text-decoration: underline;
+    }
+
+    /* ── Mobile ── */
+    @media (max-width: 520px) {
+      .card {
+        padding: 24px 18px;
+      }
+    }
+  </style>
+  <link rel="stylesheet" href="/css/ui.css" />
+</head>
+<body>
+
+  <div class="card">
+
+    <!-- Logo -->
+    <div class="logo">
+      <span>CoreInventory</span>
+      <small>Inventory Management System</small>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs" role="tablist">
+      <button class="tab-btn active" id="tabLogin"  role="tab" aria-selected="true"  aria-controls="loginForm">Login</button>
+      <button class="tab-btn"        id="tabSignup" role="tab" aria-selected="false" aria-controls="signupForm">Sign Up</button>
+    </div>
+
+    <!-- ── LOGIN FORM ── -->
+    <div class="form-panel visible" id="loginForm" role="tabpanel">
+
+      <div class="field">
+        <label for="loginId">Login ID</label>
+        <input type="text"     id="loginId"       placeholder="Enter your login ID" autocomplete="username" />
+      </div>
+
+      <div class="field">
+        <label for="loginPassword">Password</label>
+        <input type="password" id="loginPassword" placeholder="Enter password" autocomplete="current-password" />
+      </div>
+
+      <button class="btn-primary" id="signInBtn">SIGN IN</button>
+
+      <div class="form-error" id="loginError"></div>
+
+      <div class="form-footer">
+        <a href="#" id="forgotLink">Forgot Password?</a>
+        <a href="#" id="goSignup">Sign Up</a>
+      </div>
+
+    </div><!-- /loginForm -->
+
+    <!-- ── SIGN UP FORM ── -->
+    <div class="form-panel" id="signupForm" role="tabpanel">
+
+      <div class="field">
+        <label for="regLoginId">Login ID</label>
+        <input type="text"     id="regLoginId" placeholder="Choose login ID (6–12 chars)" autocomplete="username" />
+        <div class="field-error" id="errRegLoginId"></div>
+      </div>
+
+      <div class="field">
+        <label for="regEmail">Email ID</label>
+        <input type="email"    id="regEmail"   placeholder="Enter your email address" autocomplete="email" />
+        <div class="field-error" id="errRegEmail"></div>
+      </div>
+
+      <div class="field">
+        <label for="regPassword">Password</label>
+        <input type="password" id="regPassword" placeholder="Min 8 chars, upper+lower+special" autocomplete="new-password" />
+        <div class="field-error" id="errRegPassword"></div>
+      </div>
+
+      <div class="field">
+        <label for="regConfirm">Re-Enter Password</label>
+        <input type="password" id="regConfirm" placeholder="Confirm your password" autocomplete="new-password" />
+        <div class="field-error" id="errRegConfirm"></div>
+      </div>
+
+      <button class="btn-primary" id="signUpBtn">SIGN UP</button>
+
+      <div class="form-error" id="signupError"></div>
+
+    </div><!-- /signupForm -->
+
+  </div><!-- /card -->
+
+  <script src="/js/config.js"></script>
+  <script>
+    /* ── Helpers ── */
+    const $ = (id) => document.getElementById(id);
+
+    function showError(el, msg) {
+      el.textContent = msg;
+      el.style.display = msg ? 'block' : 'none';
+    }
+
+    function markInput(input, hasError) {
+      input.classList.toggle('error', hasError);
+    }
+
+    function clearFieldError(inputId, errorId) {
+      $('input' in document.getElementById(inputId) ? inputId : inputId) // always use getElementById
+      markInput($(inputId), false);
+      showError($(errorId), '');
+    }
+
+    /* ── Tab switching ── */
+    function activateTab(tab) {
+      const isLogin = tab === 'login';
+
+      $('tabLogin').classList.toggle('active', isLogin);
+      $('tabSignup').classList.toggle('active', !isLogin);
+      $('tabLogin').setAttribute('aria-selected', isLogin);
+      $('tabSignup').setAttribute('aria-selected', !isLogin);
+
+      $('loginForm').classList.toggle('visible', isLogin);
+      $('signupForm').classList.toggle('visible', !isLogin);
+
+      // clear errors on switch
+      showError($('loginError'), '');
+      ['regLoginId','regEmail','regPassword','regConfirm'].forEach((_, i) => {
+        const ids = ['regLoginId','regEmail','regPassword','regConfirm'];
+        const errIds = ['errRegLoginId','errRegEmail','errRegPassword','errRegConfirm'];
+        markInput($(ids[i]), false);
+        showError($(errIds[i]), '');
+      });
+      showError($('signupError'), '');
+    }
+
+    $('tabLogin').addEventListener('click',  () => activateTab('login'));
+    $('tabSignup').addEventListener('click', () => activateTab('signup'));
+    $('goSignup').addEventListener('click',  (e) => { e.preventDefault(); activateTab('signup'); });
+
+    $('forgotLink').addEventListener('click', (e) => {
+      e.preventDefault();
+      alert('Password reset link has been sent to your registered email.');
+    });
+
+    /* ── LOGIN ── */
+    $('signInBtn').addEventListener('click', async () => {
+      const loginId  = $('loginId').value.trim();
+      const password = $('loginPassword').value;
+
+      showError($('loginError'), '');
+
+      if (!loginId || !password) {
+        showError($('loginError'), 'Login ID and Password are required.');
+        return;
+      }
+
+      $('signInBtn').textContent = 'Signing in…';
+      $('signInBtn').disabled = true;
+
+      try {
+        const res  = await fetch(apiUrl('/api/auth/login'), {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ login_id: loginId, password }),
+        });
+        const data = await res.json();
+
+        if (!res.ok) throw new Error(data.error || 'Invalid Login ID or Password');
+
+        localStorage.setItem('token', data.token);
+        if (data.user?.name) localStorage.setItem('user_name', data.user.name);
+        location.href = '/pages/dashboard.html';
+
+      } catch (err) {
+        showError($('loginError'), err.message || 'Invalid Login ID or Password');
+      } finally {
+        $('signInBtn').textContent = 'SIGN IN';
+        $('signInBtn').disabled = false;
+      }
+    });
+
+    /* ── SIGN UP validation ── */
+    const EMAIL_RE   = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const SPECIAL_RE = /[!@#$%^&*]/;
+
+    function validateSignup() {
+      const loginId  = $('regLoginId').value.trim();
+      const email    = $('regEmail').value.trim();
+      const password = $('regPassword').value;
+      const confirm  = $('regConfirm').value;
+
+      let valid = true;
+
+      // Login ID
+      if (loginId.length < 6 || loginId.length > 12) {
+        showError($('errRegLoginId'), 'Login ID must be 6–12 characters.');
+        markInput($('regLoginId'), true);
+        valid = false;
+      } else {
+        showError($('errRegLoginId'), '');
+        markInput($('regLoginId'), false);
+      }
+
+      // Email
+      if (!EMAIL_RE.test(email)) {
+        showError($('errRegEmail'), 'Enter a valid email address.');
+        markInput($('regEmail'), true);
+        valid = false;
+      } else {
+        showError($('errRegEmail'), '');
+        markInput($('regEmail'), false);
+      }
+
+      // Password strength
+      if (password.length < 8 || !/[A-Z]/.test(password) || !/[a-z]/.test(password) || !SPECIAL_RE.test(password)) {
+        showError($('errRegPassword'), 'Min 8 chars with uppercase, lowercase & special character.');
+        markInput($('regPassword'), true);
+        valid = false;
+      } else {
+        showError($('errRegPassword'), '');
+        markInput($('regPassword'), false);
+      }
+
+      // Confirm
+      if (confirm !== password) {
+        showError($('errRegConfirm'), 'Passwords do not match.');
+        markInput($('regConfirm'), true);
+        valid = false;
+      } else {
+        showError($('errRegConfirm'), '');
+        markInput($('regConfirm'), false);
+      }
+
+      return valid;
+    }
+
+    $('signUpBtn').addEventListener('click', async () => {
+      showError($('signupError'), '');
+      if (!validateSignup()) return;
+
+      $('signUpBtn').textContent = 'Creating account…';
+      $('signUpBtn').disabled = true;
+
+      try {
+        const res  = await fetch(apiUrl('/api/auth/register'), {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({
+            login_id: $('regLoginId').value.trim(),
+            email:    $('regEmail').value.trim(),
+            password: $('regPassword').value,
+          }),
+        });
+        const data = await res.json();
+
+        if (!res.ok) throw new Error(data.error || 'Registration failed.');
+
+        // success — switch to login tab
+        activateTab('login');
+        showError($('loginError'), ''); // clear any old login error
+        const notice = document.createElement('p');
+        notice.style.cssText = 'color:#10b981;font-size:13px;margin-top:12px;text-align:center;';
+        notice.textContent = 'Account created! Please log in.';
+        $('loginForm').appendChild(notice);
+        setTimeout(() => notice.remove(), 4000);
+
+      } catch (err) {
+        showError($('signupError'), err.message || 'Something went wrong.');
+      } finally {
+        $('signUpBtn').textContent = 'SIGN UP';
+        $('signUpBtn').disabled = false;
+      }
+    });
+
+    /* ── Clear field error on input ── */
+    [
+      ['regLoginId',   'errRegLoginId'],
+      ['regEmail',     'errRegEmail'],
+      ['regPassword',  'errRegPassword'],
+      ['regConfirm',   'errRegConfirm'],
+    ].forEach(([inputId, errorId]) => {
+      $(inputId).addEventListener('input', () => {
+        markInput($(inputId), false);
+        showError($(errorId), '');
+      });
+    });
+
+    ['loginId', 'loginPassword'].forEach((id) => {
+      $(id).addEventListener('input', () => showError($('loginError'), ''));
+    });
+
+    /* ── Enter key support ── */
+    $('loginForm').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') $('signInBtn').click();
+    });
+
+    $('signupForm').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') $('signUpBtn').click();
+    });
+  </script>
+
+  <script src="/js/ui.js"></script>
+</body>
+</html>
